@@ -1,0 +1,41 @@
+{
+  "kind": "ReplicationController",
+  "apiVersion": "v1",
+  "metadata": {
+    "name": "api",
+    "namespace": "template",
+    "labels": {
+      "name": "api"
+    }
+  },
+  "spec": {
+    "replicas": 1,
+    "template": {
+      "metadata": {
+        "labels": {
+          "name": "api"
+        }
+      },
+      "spec": {
+        "containers": [
+          {
+            "name": "api",
+            "image": "stevesloka/k8s-api",
+            "ports": [
+              {
+                "name": "api-port",
+                "containerPort": 8080
+              }
+            ],
+            "env": [
+              {
+                "name": "spring_datasource_url",
+                "value": "jdbc:mysql://db/demo_db"
+              }
+            ]
+          }
+        ]
+      }
+    }
+  }
+}

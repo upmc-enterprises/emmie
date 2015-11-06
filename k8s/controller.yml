@@ -1,0 +1,35 @@
+apiVersion: v1
+kind: ReplicationController
+metadata:
+  name: emmie-v0.0.1
+  labels:
+    version: v0.0.1
+spec:
+  replicas: 1
+  selector:
+    name: emmie
+    version: v0.0.1
+  template:
+    metadata:
+      labels:
+        name: emmie
+        version: v0.0.1
+    spec:
+      containers:
+      - name: emmie
+        image: stevesloka/emmie:0.0.1
+        resources:
+          limits:
+            cpu: 100m
+            memory: 50Mi
+        args:
+        - -kubecfg_file=/etc/kubeconfig
+        - -docker-registry=private-registry.stevesloka.com/
+        pullPolicy: Always
+        volumeMounts:
+        - name: kubeconfig
+          mountPath: /etc/kubeconfig:z
+      volumes:
+      - hostPath:
+          path: /var/lib/kubelet/kubeconfig
+        name: kubeconfig

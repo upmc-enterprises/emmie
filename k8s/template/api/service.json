@@ -1,0 +1,19 @@
+{
+  "kind": "Service",
+  "apiVersion": "v1",
+  "metadata": {
+    "name": "api"
+  },
+  "spec": {
+    "ports": [
+      {
+        "port": 8080,
+        "targetPort": 8080
+      }
+    ],
+    "selector": {
+      "name": "api"
+    },
+    "type": "NodePort"
+  }
+}
