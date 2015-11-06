@@ -32,7 +32,10 @@ Emmie integrates into the k8s api via the supported go client. Setup your CI ser
 * Configure CI to curl Emmie and deploy new namespace
 * Bask in the glory of how your team will produce better well tested code
 
-[![Emmie Demo](http://img.youtube.com/vi/w7rshjxsojA/0.jpg)](http://www.youtube.com/watch?v=w7rshjxsojA)
+## Demo
+Watch a demo here:<br>
+[![Emmie Demo](http://img.youtube.com/vi/w7rshjxsojA/0.jpg)](http://www.youtube.com/watch?v=w7rshjxsojA)<br>
+[http://www.youtube.com/watch?v=w7rshjxsojA](http://www.youtube.com/watch?v=w7rshjxsojA)
 
 ## Gotchas
 * Do not have network mounts or host mounts, for now this proves difficult to manage via the template system
