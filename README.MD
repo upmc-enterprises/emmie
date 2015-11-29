@@ -32,6 +32,9 @@ Emmie integrates into the k8s api via the supported go client. Setup your CI ser
 * Configure CI to curl Emmie and deploy new namespace
 * Bask in the glory of how your team will produce better well tested code
 
+## Generate Self-Signed cert
+`openssl req -x509 -newkey rsa:2048 -keyout key.pem -out cert.pem -days 365 -nodes`
+
 ## Demo
 Watch a demo here:<br>
 [![Emmie Demo](http://img.youtube.com/vi/w7rshjxsojA/0.jpg)](http://www.youtube.com/watch?v=w7rshjxsojA)<br>
