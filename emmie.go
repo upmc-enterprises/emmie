@@ -265,6 +265,10 @@ func main() {
 	}
 	client = kubeClient
 
+	// create namespace
+	createNamespace("foo")
+	deleteNamespace("foo")
+
 	// Start server
-	log.Fatal(http.ListenAndServe(fmt.Sprintf(":%d", *argListenPort), router))
+	log.Fatal(http.ListenAndServeTLS(fmt.Sprintf(":%d", *argListenPort), "certs/cert.pem", "certs/key.pem", router))
 }
