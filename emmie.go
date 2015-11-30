@@ -27,6 +27,7 @@ ON ANY THEORY OF LIABILITY, WHETHER IN CONTRACT, STRICT LIABILITY, OR TORT
 package main
 
 import (
+	"bufio"
 	"flag"
 	"fmt"
 	"log"
@@ -49,6 +50,7 @@ var (
 	argKubecfgFile       = flag.String("kubecfg-file", "", "Location of kubecfg file for access to kubernetes master service; --kube_master_url overrides the URL part of this; if neither this nor --kube_master_url are provided, defaults to service account tokens")
 	argKubeMasterURL     = flag.String("kube-master-url", "", "URL to reach kubernetes master. Env variables in this flag will be expanded.")
 	argTemplateNamespace = flag.String("template-namespace", "template", "Namespace to 'clone from when creating new deployments'")
+	argPathToTokens      = flag.String("path-to-tokens", "tokens.txt", "Full path including file name to tokens file for authorization, setting to empty string will disable.")
 	client               *kclient.Client
 )
 
@@ -108,6 +110,11 @@ func indexRoute(w http.ResponseWriter, r *http.Request) {
 
 // Version (GET "/version")
 func versionRoute(w http.ResponseWriter, r *http.Request) {
+	if !tokenIsValid(r.FormValue("token")) {
+		w.WriteHeader(http.StatusUnauthorized)
+		return
+	}
+
 	fmt.Fprintf(w, "%q", appVersion)
 }
 
@@ -116,6 +123,11 @@ func deployRoute(w http.ResponseWriter, r *http.Request) {
 	vars := mux.Vars(r)
 	branchName := vars["branchName"]
 	imageNamespace := vars["namespace"]
+
+	if !tokenIsValid(r.FormValue("token")) {
+		w.WriteHeader(http.StatusUnauthorized)
+		return
+	}
 
 	// sanitize BranchName
 	branchName = strings.Replace(branchName, "_", "-", -1)
@@ -200,6 +212,11 @@ func updateRoute(w http.ResponseWriter, r *http.Request) {
 	branchName := vars["branchName"]
 	glog.Info(w, "[Emmie] is updating branch:", branchName)
 
+	if !tokenIsValid(r.FormValue("token")) {
+		w.WriteHeader(http.StatusUnauthorized)
+		return
+	}
+
 	// sanitize BranchName
 	branchName = strings.Replace(branchName, "_", "-", -1)
 
@@ -213,6 +230,11 @@ func deleteRoute(w http.ResponseWriter, r *http.Request) {
 	vars := mux.Vars(r)
 	branchName := vars["branchName"]
 	glog.Info("[Emmie] is deleting branch:", branchName)
+
+	if !tokenIsValid(r.FormValue("token")) {
+		w.WriteHeader(http.StatusUnauthorized)
+		return
+	}
 
 	// sanitize BranchName
 	branchName = strings.Replace(branchName, "_", "-", -1)
@@ -233,6 +255,34 @@ func deleteRoute(w http.ResponseWriter, r *http.Request) {
 
 	deleteNamespace(branchName)
 	glog.Info("[Emmie] is done deleting branch.")
+}
+
+func tokenIsValid(token string) bool {
+	// If no path is passed, then auth is disabled
+	if *argPathToTokens == "" {
+		return true
+	}
+
+	file, err := os.Open(*argPathToTokens)
+	if err != nil {
+		log.Fatal(err)
+	}
+	defer file.Close()
+
+	scanner := bufio.NewScanner(file)
+	for scanner.Scan() {
+		if token == scanner.Text() {
+			fmt.Println("Token IS valid!")
+			return true
+		}
+	}
+
+	if err := scanner.Err(); err != nil {
+		log.Fatal(err)
+	}
+
+	fmt.Println("Token is NOT valid! =(")
+	return false
 }
 
 func main() {
