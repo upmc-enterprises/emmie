@@ -289,6 +289,11 @@ func main() {
 	flag.Parse()
 	glog.Info("[Emmie] is up and running!", time.Now())
 
+	// Sanitize docker registry
+	if *argDockerRegistry != "" {
+		*argDockerRegistry = fmt.Sprintf("%s/", *argDockerRegistry)
+	}
+
 	// Configure router
 	router := mux.NewRouter().StrictSlash(true)
 	router.HandleFunc("/", indexRoute)
@@ -314,10 +319,6 @@ func main() {
 		glog.Fatalf("Failed to create a kubernetes client: %v", err)
 	}
 	client = kubeClient
-
-	// create namespace
-	createNamespace("foo")
-	deleteNamespace("foo")
 
 	// Start server
 	log.Fatal(http.ListenAndServeTLS(fmt.Sprintf(":%d", *argListenPort), "certs/cert.pem", "certs/key.pem", router))

@@ -17,19 +17,24 @@ spec:
     spec:
       containers:
       - name: emmie
-        image: stevesloka/emmie:0.0.1
+        image: stevesloka/emmie:latest
         resources:
           limits:
             cpu: 100m
             memory: 50Mi
         args:
-        - -kubecfg_file=/etc/kubeconfig
-        - -docker-registry=private-registry.stevesloka.com/
-        pullPolicy: Always
+        - -kubecfg-file=/etc/kubeconfig
+        - -docker-registry=''
+        - -path-to-tokens=/etc/emmie-tokens/tokens.txt
         volumeMounts:
         - name: kubeconfig
-          mountPath: /etc/kubeconfig:z
+          mountPath: /etc/kubeconfig
+        - name: tokens
+          mountPath: /etc/emmie-tokens
       volumes:
       - hostPath:
           path: /var/lib/kubelet/kubeconfig
         name: kubeconfig
+      - secret:
+          secretName: emmie-tokens
+        name: tokens
