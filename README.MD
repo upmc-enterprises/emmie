@@ -14,6 +14,7 @@ Emmie assists with creating unique and isolated environments for each feature be
 * kube-master-url:  overrides the URL part of this; if neither this nor --kube_master_url are provided, defaults to service account tokens
 * kube-master-url: URL to reach kubernetes master. Env variables in this flag will be expanded
 * template-namespace: Namespace to 'clone from when creating new deployments'
+* path-to-tokens: Full path including file name to tokens file for authorization, setting to empty string will disable.
 
 ## How it works
 Emmie integrates into the k8s api via the supported go client. Setup your CI server to build all Docker images and tag with branch name. Then send POST request and Emmie will look at all the services and replication controllers in the configured template namespace, and deploy to a new namespace. You can repeat this as many times as your cluster has resources.
@@ -24,8 +25,11 @@ Emmie integrates into the k8s api via the supported go client. Setup your CI ser
 * PUT /deploy/{branchName} : Update an existing environment
 * GET /deploy : Get list of current deployments
 
+_NOTE: Include a token query string to end of all requests for simple auth._
+
 ## Get Started
-1. Deploy Emmie to your cluster ([See samples](k8s))
+1. Create auth tokens file
+* Deploy Emmie to your cluster ([See samples](k8s))
 * Create template namespace
 * Deploy template services / replication controllers
 * Configure CI to build feature branch images
