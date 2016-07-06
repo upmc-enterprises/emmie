@@ -60,7 +60,8 @@ func createNamespace(name string) error {
 // listNamespaces by label
 func listNamespaces(labelKey, labelValue string) (*api.NamespaceList, error) {
 	selector := labels.Set{labelKey: labelValue}.AsSelector()
-	list, err := client.Namespaces().List(selector, fields.Everything())
+	listOptions := api.ListOptions{FieldSelector: fields.Everything(), LabelSelector: selector}
+	list, err := client.Namespaces().List(listOptions)
 
 	if err != nil {
 		glog.Error("[listServices] Error listing namespaces", err)

@@ -82,7 +82,7 @@ func getServicesRoute(w http.ResponseWriter, r *http.Request) {
 }
 
 func listServicesByNamespace(namespace string) (*api.ServiceList, error) {
-	list, err := client.Services(namespace).List(labels.Everything(), fields.Everything())
+	list, err := client.Services(namespace).List(api.ListOptions{})
 
 	if err != nil {
 		glog.Error("[listServicesByNamespace] error listing services", err)
@@ -98,7 +98,8 @@ func listServicesByNamespace(namespace string) (*api.ServiceList, error) {
 
 func listServices(namespace, labelKey, labelValue string) (*api.ServiceList, error) {
 	selector := labels.Set{labelKey: labelValue}.AsSelector()
-	list, err := client.Services(namespace).List(selector, fields.Everything())
+	listOptions := api.ListOptions{FieldSelector: fields.Everything(), LabelSelector: selector}
+	list, err := client.Services(namespace).List(listOptions)
 
 	if err != nil {
 		glog.Error("[listServices] Error listing services", err)

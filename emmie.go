@@ -40,6 +40,7 @@ import (
 	"github.com/golang/glog"
 	"github.com/gorilla/mux"
 	"k8s.io/kubernetes/pkg/api"
+	"k8s.io/kubernetes/pkg/client/restclient"
 	kclient "k8s.io/kubernetes/pkg/client/unversioned"
 	kclientcmd "k8s.io/kubernetes/pkg/client/unversioned/clientcmd"
 )
@@ -71,7 +72,7 @@ func expandKubeMasterURL() (string, error) {
 
 func newKubeClient() (*kclient.Client, error) {
 	var (
-		config    *kclient.Config
+		config    *restclient.Config
 		err       error
 		masterURL string
 	)
@@ -85,9 +86,8 @@ func newKubeClient() (*kclient.Client, error) {
 	}
 
 	if masterURL != "" && *argKubecfgFile == "" {
-		config = &kclient.Config{
-			Host:    masterURL,
-			Version: "v1",
+		config = &restclient.Config{
+			Host: masterURL,
 		}
 	} else {
 		overrides := &kclientcmd.ConfigOverrides{}
@@ -99,7 +99,6 @@ func newKubeClient() (*kclient.Client, error) {
 	}
 
 	glog.Infof("Using %s for kubernetes master", config.Host)
-	glog.Infof("Using kubernetes API %s", config.Version)
 	return kclient.New(config)
 }
 

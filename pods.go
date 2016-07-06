@@ -29,12 +29,10 @@ package main
 import (
 	"github.com/golang/glog"
 	"k8s.io/kubernetes/pkg/api"
-	"k8s.io/kubernetes/pkg/fields"
-	"k8s.io/kubernetes/pkg/labels"
 )
 
 func deletePodsByNamespace(namespace string) (*api.PodList, error) {
-	list, err := client.Pods(namespace).List(labels.Everything(), fields.Everything())
+	list, err := client.Pods(namespace).List(api.ListOptions{})
 
 	if err != nil {
 		glog.Error("[deletePodsByNamespace] Error deleting pods", err)

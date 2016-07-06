@@ -24,7 +24,6 @@ ON ANY THEORY OF LIABILITY, WHETHER IN CONTRACT, STRICT LIABILITY, OR TORT
 (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE OF THIS
 */
 
-
 package main
 
 import (
@@ -83,7 +82,7 @@ func getReplicationControllersRoute(w http.ResponseWriter, r *http.Request) {
 }
 
 func listReplicationControllersByNamespace(namespace string) (*api.ReplicationControllerList, error) {
-	list, err := client.ReplicationControllers(namespace).List(labels.Everything(), fields.Everything())
+	list, err := client.ReplicationControllers(namespace).List(api.ListOptions{})
 
 	if err != nil {
 		glog.Error("[listReplicationControllersByNamespace] Error listing replicationControllers", err)
@@ -94,7 +93,8 @@ func listReplicationControllersByNamespace(namespace string) (*api.ReplicationCo
 
 func listReplicationControllers(namespace, labelKey, labelValue string) (*api.ReplicationControllerList, error) {
 	selector := labels.Set{labelKey: labelValue}.AsSelector()
-	list, err := client.ReplicationControllers(namespace).List(selector, fields.Everything())
+	listOptions := api.ListOptions{FieldSelector: fields.Everything(), LabelSelector: selector}
+	list, err := client.ReplicationControllers(namespace).List(listOptions)
 
 	if err != nil {
 		glog.Error("[listReplicationControllers] Error listing replicationControllers", err)
