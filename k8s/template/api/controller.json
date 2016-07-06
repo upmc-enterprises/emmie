@@ -20,7 +20,7 @@
         "containers": [
           {
             "name": "api",
-            "image": "stevesloka/k8s-api",
+            "image": "stevesloka/api",
             "ports": [
               {
                 "name": "api-port",

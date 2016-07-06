@@ -20,7 +20,7 @@
         "containers": [
           {
             "name": "db",
-            "image": "stevesloka/k8s-mysql",
+            "image": "stevesloka/mysql",
             "ports": [
               {
                 "name": "mysql-server",

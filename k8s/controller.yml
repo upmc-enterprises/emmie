@@ -24,7 +24,7 @@ spec:
             memory: 50Mi
         args:
         - -kubecfg-file=/etc/kubeconfig
-        - -docker-registry=''
+        - -docker-registry=
         - -path-to-tokens=/etc/emmie-tokens/tokens.txt
         volumeMounts:
         - name: kubeconfig

@@ -21,6 +21,6 @@
     "selector": {
       "name": "web"
     },
-    "type": "NodePort"
+    "type": "LoadBalancer"
   }
 }
