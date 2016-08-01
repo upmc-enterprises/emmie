@@ -37,7 +37,6 @@ import (
 	"strings"
 	"time"
 
-	"github.com/golang/glog"
 	"github.com/gorilla/mux"
 	"k8s.io/kubernetes/pkg/api"
 	"k8s.io/kubernetes/pkg/client/restclient"
@@ -51,12 +50,12 @@ var (
 	argKubecfgFile       = flag.String("kubecfg-file", "", "Location of kubecfg file for access to kubernetes master service; --kube_master_url overrides the URL part of this; if neither this nor --kube_master_url are provided, defaults to service account tokens")
 	argKubeMasterURL     = flag.String("kube-master-url", "", "URL to reach kubernetes master. Env variables in this flag will be expanded.")
 	argTemplateNamespace = flag.String("template-namespace", "template", "Namespace to 'clone from when creating new deployments'")
-	argPathToTokens      = flag.String("path-to-tokens", "tokens.txt", "Full path including file name to tokens file for authorization, setting to empty string will disable.")
+	argPathToTokens      = flag.String("path-to-tokens", "", "Full path including file name to tokens file for authorization, setting to empty string will disable.")
 	client               *kclient.Client
 )
 
 const (
-	appVersion = "0.0.1"
+	appVersion = "0.0.2"
 )
 
 func expandKubeMasterURL() (string, error) {
@@ -98,7 +97,7 @@ func newKubeClient() (*kclient.Client, error) {
 		}
 	}
 
-	glog.Infof("Using %s for kubernetes master", config.Host)
+	log.Println(fmt.Sprintf("Using %s for kubernetes master", config.Host))
 	return kclient.New(config)
 }
 
@@ -130,7 +129,7 @@ func deployRoute(w http.ResponseWriter, r *http.Request) {
 
 	// sanitize BranchName
 	branchName = strings.Replace(branchName, "_", "-", -1)
-	glog.Info("[Emmie] is deploying branch:", branchName)
+	log.Println("[Emmie] is deploying branch:", branchName)
 
 	// create namespace
 	err := createNamespace(branchName)
@@ -138,32 +137,77 @@ func deployRoute(w http.ResponseWriter, r *http.Request) {
 	if err != nil {
 		// TODO: Don't use error for logic
 		// Existing namespace, do an update
-		glog.Info("Existing namespace found: ", branchName, " deleting pods.")
+		log.Println("Existing namespace found: ", branchName, " deleting pods.")
 
 		deletePodsByNamespace(branchName)
 	} else {
-		glog.Info("Namespace created, deploying new app...")
+		log.Println("Namespace created, deploying new app...")
 
 		// copy controllers / services based on label query
 		rcs, _ := listReplicationControllersByNamespace(*argTemplateNamespace)
-		glog.Info("Found ", len(rcs.Items), " template replication controllers to copy.")
+		log.Println("Found ", len(rcs.Items), " template replication controllers to copy.")
 
 		svcs, _ := listServicesByNamespace(*argTemplateNamespace)
-		glog.Info("Found ", len(svcs.Items), " template services to copy.")
+		log.Println("Found ", len(svcs.Items), " template services to copy.")
+
+		secrets, _ := listSecretsByNamespace(*argTemplateNamespace)
+		log.Println("Found ", len(secrets.Items), " template secrets to copy.")
+
+		configmaps, _ := listConfigMapsByNamespace(*argTemplateNamespace)
+		log.Println("Found ", len(configmaps.Items), " template configmaps to copy.")
+
+		// create configmaps
+		for _, configmap := range configmaps.Items {
+
+			requestConfigMap := &api.ConfigMap{
+				ObjectMeta: api.ObjectMeta{
+					Name:      configmap.Name,
+					Namespace: branchName,
+				},
+				Data: configmap.Data,
+			}
+
+			createConfigMap(branchName, requestConfigMap)
+		}
+
+		// create secrets
+		for _, secret := range secrets.Items {
+
+			// skip service accounts
+			if secret.Type != "kubernetes.io/service-account-token" {
+
+				requestSecret := &api.Secret{
+					ObjectMeta: api.ObjectMeta{
+						Name:      secret.Name,
+						Namespace: branchName,
+					},
+					Type: secret.Type,
+					Data: secret.Data,
+				}
+
+				createSecret(branchName, requestSecret)
+			}
+		}
 
 		// create services
 		for _, svc := range svcs.Items {
 
+			// Create annotations for Deis router
+			annotations := make(map[string]string)
+			annotations["router.deis.io/domains"] = fmt.Sprintf("%s,www.%s.local.k8s.com", branchName, branchName)
+
 			requestService := &api.Service{
 				ObjectMeta: api.ObjectMeta{
-					Name:      svc.ObjectMeta.Name,
-					Namespace: branchName,
+					Name:        svc.ObjectMeta.Name,
+					Namespace:   branchName,
+					Annotations: annotations,
 				},
 			}
 
 			ports := []api.ServicePort{}
 			for _, port := range svc.Spec.Ports {
 				newPort := api.ServicePort{
+					Name:       port.Name,
 					Protocol:   port.Protocol,
 					Port:       port.Port,
 					TargetPort: port.TargetPort,
@@ -181,12 +225,33 @@ func deployRoute(w http.ResponseWriter, r *http.Request) {
 
 		// now that we have all replicationControllers, update them to have new image name
 		for _, rc := range rcs.Items {
-			// TODO: Need to specify which containers should get new images (Defaulting to the first container)
-			rc.Spec.Template.Spec.Containers[0].Image =
-				fmt.Sprintf("%s%s/%s:%s", *argDockerRegistry, imageNamespace, rc.ObjectMeta.Labels["name"], branchName)
+
+			containerNameToUpdate := ""
+
+			// Looks for annotations to know which container to replace
+			for key, value := range rc.Annotations {
+				if key == "emmie-update" {
+					containerNameToUpdate = value
+				}
+			}
+
+			// Find the container which matches the annotation
+			for i, container := range rc.Spec.Template.Spec.Containers {
+
+				imageName := ""
+
+				if containerNameToUpdate == "" {
+					//default to current image tag if no annotations found
+					imageName = container.Image
+				} else {
+					imageName = fmt.Sprintf("%s%s/%s:%s", *argDockerRegistry, imageNamespace, rc.ObjectMeta.Labels["name"], branchName)
+				}
+
+				rc.Spec.Template.Spec.Containers[i].Image = imageName
 
 				// Set the image pull policy to "Always"
-			rc.Spec.Template.Spec.Containers[0].ImagePullPolicy = "Always"
+				rc.Spec.Template.Spec.Containers[i].ImagePullPolicy = "Always"
+			}
 
 			requestController := &api.ReplicationController{
 				ObjectMeta: api.ObjectMeta{
@@ -202,14 +267,14 @@ func deployRoute(w http.ResponseWriter, r *http.Request) {
 			createReplicationController(branchName, requestController)
 		}
 	}
-	glog.Info("[Emmie] is finished deploying branch!")
+	log.Println("[Emmie] is finished deploying branch!")
 }
 
 // Put (PUT "/deploy")
 func updateRoute(w http.ResponseWriter, r *http.Request) {
 	vars := mux.Vars(r)
 	branchName := vars["branchName"]
-	glog.Info(w, "[Emmie] is updating branch:", branchName)
+	log.Println(w, "[Emmie] is updating branch:", branchName)
 
 	if !tokenIsValid(r.FormValue("token")) {
 		w.WriteHeader(http.StatusUnauthorized)
@@ -221,14 +286,14 @@ func updateRoute(w http.ResponseWriter, r *http.Request) {
 
 	deletePodsByNamespace(branchName)
 
-	glog.Info("Finished updating branch!")
+	log.Println("Finished updating branch!")
 }
 
 // Delete (DELETE "/deploy")
 func deleteRoute(w http.ResponseWriter, r *http.Request) {
 	vars := mux.Vars(r)
 	branchName := vars["branchName"]
-	glog.Info("[Emmie] is deleting branch:", branchName)
+	log.Println("[Emmie] is deleting branch:", branchName)
 
 	if !tokenIsValid(r.FormValue("token")) {
 		w.WriteHeader(http.StatusUnauthorized)
@@ -238,22 +303,34 @@ func deleteRoute(w http.ResponseWriter, r *http.Request) {
 	// sanitize BranchName
 	branchName = strings.Replace(branchName, "_", "-", -1)
 
-	// get controllers / services in namespace
+	// get controllers / services / secrets in namespace
 	rcs, _ := listReplicationControllersByNamespace(*argTemplateNamespace)
 
 	for _, rc := range rcs.Items {
 		deleteReplicationController(branchName, rc.ObjectMeta.Name)
-		glog.Info("Deleted replicationController:", rc.ObjectMeta.Name)
+		log.Println("Deleted replicationController:", rc.ObjectMeta.Name)
 	}
 
 	svcs, _ := listServicesByNamespace(*argTemplateNamespace)
 	for _, svc := range svcs.Items {
 		deleteService(branchName, svc.ObjectMeta.Name)
-		glog.Info("Deleted service:", svc.ObjectMeta.Name)
+		log.Println("Deleted service:", svc.ObjectMeta.Name)
+	}
+
+	secrets, _ := listSecretsByNamespace(*argTemplateNamespace)
+	for _, secret := range secrets.Items {
+		deleteSecret(branchName, secret.ObjectMeta.Name)
+		log.Println("Deleted secret:", secret.ObjectMeta.Name)
+	}
+
+	configmaps, _ := listConfigMapsByNamespace(*argTemplateNamespace)
+	for _, configmap := range configmaps.Items {
+		deleteSecret(branchName, configmap.ObjectMeta.Name)
+		log.Println("Deleted configmap:", configmap.ObjectMeta.Name)
 	}
 
 	deleteNamespace(branchName)
-	glog.Info("[Emmie] is done deleting branch.")
+	log.Println("[Emmie] is done deleting branch.")
 }
 
 func tokenIsValid(token string) bool {
@@ -286,7 +363,7 @@ func tokenIsValid(token string) bool {
 
 func main() {
 	flag.Parse()
-	glog.Info("[Emmie] is up and running!", time.Now())
+	log.Println("[Emmie] is up and running!", time.Now())
 
 	// Sanitize docker registry
 	if *argDockerRegistry != "" {
@@ -306,7 +383,7 @@ func main() {
 	// router.HandleFunc("/services/{namespace}/{key}/{value}", getServicesRoute).Methods("GET")
 
 	// ReplicationControllers
-	// router.HandleFunc("/replicationControllers/{namespace}/{rcName}", getReplicationControllerRoute).Methods("GET")
+	router.HandleFunc("/replicationControllers/{namespace}/{rcName}", getReplicationControllerRoute).Methods("GET")
 	// router.HandleFunc("/replicationControllers/{namespace}/{key}/{value}", getReplicationControllersRoute).Methods("GET")
 
 	// Version
@@ -315,7 +392,7 @@ func main() {
 	// Create k8s client
 	kubeClient, err := newKubeClient()
 	if err != nil {
-		glog.Fatalf("Failed to create a kubernetes client: %v", err)
+		log.Println("Failed to create a kubernetes client: %v", err)
 	}
 	client = kubeClient
 

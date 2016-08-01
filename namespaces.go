@@ -28,9 +28,8 @@ package main
 
 import (
 	"encoding/json"
+	"log"
 	"net/http"
-
-	"github.com/golang/glog"
 
 	"k8s.io/kubernetes/pkg/api"
 	"k8s.io/kubernetes/pkg/fields"
@@ -50,7 +49,7 @@ func createNamespace(name string) error {
 	_, err := client.Namespaces().Create(ns)
 
 	if err != nil {
-		glog.Error("[createNamespace] Error creating namespace", err)
+		log.Println("[createNamespace] Error creating namespace", err)
 		return err
 	}
 
@@ -64,12 +63,12 @@ func listNamespaces(labelKey, labelValue string) (*api.NamespaceList, error) {
 	list, err := client.Namespaces().List(listOptions)
 
 	if err != nil {
-		glog.Error("[listServices] Error listing namespaces", err)
+		log.Println("[listServices] Error listing namespaces", err)
 		return nil, err
 	}
 
 	if len(list.Items) == 0 {
-		glog.Info("[listServices] No namespaces could be found: labelKey: ", labelKey, " labelValue: ", labelValue)
+		log.Println("[listServices] No namespaces could be found: labelKey: ", labelKey, " labelValue: ", labelValue)
 	}
 
 	return list, nil
@@ -80,11 +79,11 @@ func deleteNamespace(name string) {
 	err := client.Namespaces().Delete(name)
 
 	if err != nil {
-		glog.Error("[deleteNamespace] Error deleting namespace", err)
+		log.Println("[deleteNamespace] Error deleting namespace", err)
 		return
 	}
 
-	glog.Info("Deleted namespace:", name)
+	log.Println("Deleted namespace:", name)
 }
 
 func getDeploymentsRoute(w http.ResponseWriter, r *http.Request) {

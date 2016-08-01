@@ -32,9 +32,20 @@ _NOTE: Include a token query string to end of all requests for simple auth._
 * Deploy Emmie to your cluster ([See samples](k8s))
 * Create template namespace
 * Deploy template services / replication controllers
+  * _NOTE: Make sure your templates have correct Annotations on them for what to deploy (See [Annotations](#Annotations) section below)._
 * Configure CI to build feature branch images
 * Configure CI to curl Emmie and deploy new namespace
 * Bask in the glory of how your team will produce better well tested code
+
+### Annotations
+
+Since a pod can be made up of many containers, an annation is required to tell Emmie how to update that pod when deploying new code. In the example below, Emmie looks for the key `emmie-update` and uses the value to find the container name to replace. In this case the container named `web` in the pod will be updated with the feature branch deploy.
+
+```
+annotations:
+      emmie-update: web
+```
+
 
 ## Generate Self-Signed cert
 `openssl req -x509 -newkey rsa:2048 -keyout key.pem -out cert.pem -days 365 -nodes`

@@ -38,12 +38,12 @@ import (
 	"k8s.io/kubernetes/pkg/labels"
 )
 
-func getReplicationControllerRoute(w http.ResponseWriter, r *http.Request) {
+func getConfigMapRoute(w http.ResponseWriter, r *http.Request) {
 	vars := mux.Vars(r)
-	rcName := vars["rcName"]
+	ConfigMapName := vars["ConfigMapName"]
 	namespace := vars["namespace"]
 
-	rc, err := getReplicationController(rcName, namespace)
+	ConfigMap, err := getConfigMap(ConfigMapName, namespace)
 
 	w.Header().Set("Content-Type", "application/json; charset=UTF-8")
 
@@ -51,28 +51,28 @@ func getReplicationControllerRoute(w http.ResponseWriter, r *http.Request) {
 		w.WriteHeader(http.StatusNotFound)
 	} else {
 		w.WriteHeader(http.StatusOK)
-		if err := json.NewEncoder(w).Encode(rc); err != nil {
+		if err := json.NewEncoder(w).Encode(ConfigMap); err != nil {
 			panic(err)
 		}
 	}
 }
 
-func getReplicationControllersRoute(w http.ResponseWriter, r *http.Request) {
+func getConfigMapsRoute(w http.ResponseWriter, r *http.Request) {
 	vars := mux.Vars(r)
 	key := vars["key"]
 	value := vars["value"]
 	namespace := vars["namespace"]
 
-	rc, err := listReplicationControllers(namespace, key, value)
+	ConfigMap, err := listConfigMaps(namespace, key, value)
 
 	w.Header().Set("Content-Type", "application/json; charset=UTF-8")
 
 	if err != nil {
 		w.WriteHeader(http.StatusInternalServerError)
 	} else {
-		if len(rc.Items) > 0 {
+		if len(ConfigMap.Items) > 0 {
 			w.WriteHeader(http.StatusOK)
-			if err := json.NewEncoder(w).Encode(rc); err != nil {
+			if err := json.NewEncoder(w).Encode(ConfigMap); err != nil {
 				panic(err)
 			}
 		} else {
@@ -81,52 +81,63 @@ func getReplicationControllersRoute(w http.ResponseWriter, r *http.Request) {
 	}
 }
 
-func listReplicationControllersByNamespace(namespace string) (*api.ReplicationControllerList, error) {
-	list, err := client.ReplicationControllers(namespace).List(api.ListOptions{})
+func listConfigMapsByNamespace(namespace string) (*api.ConfigMapList, error) {
+	list, err := client.ConfigMaps(namespace).List(api.ListOptions{})
 
 	if err != nil {
-		log.Println("[listReplicationControllersByNamespace] Error listing replicationControllers", err)
+		log.Println("[listConfigMapsByNamespace] error listing ConfigMaps", err)
 		return nil, err
 	}
+
+	if len(list.Items) == 0 {
+		log.Println("[listConfigMapsByNamespace] No ConfigMaps could be found for namespace!", namespace)
+	}
+
 	return list, nil
 }
 
-func listReplicationControllers(namespace, labelKey, labelValue string) (*api.ReplicationControllerList, error) {
+func listConfigMaps(namespace, labelKey, labelValue string) (*api.ConfigMapList, error) {
 	selector := labels.Set{labelKey: labelValue}.AsSelector()
 	listOptions := api.ListOptions{FieldSelector: fields.Everything(), LabelSelector: selector}
-	list, err := client.ReplicationControllers(namespace).List(listOptions)
+	list, err := client.ConfigMaps(namespace).List(listOptions)
 
 	if err != nil {
-		log.Println("[listReplicationControllers] Error listing replicationControllers", err)
+		log.Println("[listConfigMaps] Error listing ConfigMaps", err)
 		return nil, err
 	}
+
+	if len(list.Items) == 0 {
+		log.Println("[listConfigMaps] No ConfigMaps could be found for namespace:", namespace, " labelKey: ", labelKey, " labelValue: ", labelValue)
+	}
+
 	return list, nil
 }
 
-func getReplicationController(replicationControllerName, namespace string) (*api.ReplicationController, error) {
-	rc, err := client.ReplicationControllers(namespace).Get(replicationControllerName)
+func getConfigMap(ConfigMapName, namespace string) (*api.ConfigMap, error) {
+	svc, err := client.ConfigMaps(namespace).Get(ConfigMapName)
 
 	if err != nil {
-		log.Println("[getReplicationController] Error getting replicationController", err)
+		log.Println("[getConfigMap] Error getting ConfigMap!", err)
 		return nil, err
 	}
-	return rc, nil
+
+	return svc, nil
 }
 
-func createReplicationController(namespace string, rc *api.ReplicationController) error {
-	_, err := client.ReplicationControllers(namespace).Create(rc)
+func createConfigMap(namespace string, ConfigMap *api.ConfigMap) error {
+	_, err := client.ConfigMaps(namespace).Create(ConfigMap)
 
 	if err != nil {
-		log.Println("[createReplicationController] Error creating replicationController:", err)
+		log.Println("[createConfigMap] Error creating ConfigMap:", err)
 	}
 	return err
 }
 
-func deleteReplicationController(namespace, name string) error {
-	err := client.ReplicationControllers(namespace).Delete(name)
+func deleteConfigMap(namespace, name string) error {
+	err := client.ConfigMaps(namespace).Delete(name)
 
 	if err != nil {
-		log.Println("[deleteReplicationController] Error deleting replicationController:", err)
+		log.Println("[deleteConfigMap] Error deleting ConfigMap:", err)
 	}
 	return err
 }
