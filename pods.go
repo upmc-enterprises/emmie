@@ -27,7 +27,8 @@ ON ANY THEORY OF LIABILITY, WHETHER IN CONTRACT, STRICT LIABILITY, OR TORT
 package main
 
 import (
-	"github.com/golang/glog"
+	"log"
+
 	"k8s.io/kubernetes/pkg/api"
 )
 
@@ -35,7 +36,7 @@ func deletePodsByNamespace(namespace string) (*api.PodList, error) {
 	list, err := client.Pods(namespace).List(api.ListOptions{})
 
 	if err != nil {
-		glog.Error("[deletePodsByNamespace] Error deleting pods", err)
+		log.Println("[deletePodsByNamespace] Error deleting pods", err)
 		return nil, err
 	}
 
@@ -51,7 +52,7 @@ func deletePod(namespace, podName string) error {
 	err := client.Pods(namespace).Delete(podName, nil)
 
 	if err != nil {
-		glog.Error("[deletePod] Could not delete pod:", podName)
+		log.Println("[deletePod] Could not delete pod:", podName)
 	}
 
 	return err

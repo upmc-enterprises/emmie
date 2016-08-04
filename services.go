@@ -28,9 +28,9 @@ package main
 
 import (
 	"encoding/json"
+	"log"
 	"net/http"
 
-	"github.com/golang/glog"
 	"github.com/gorilla/mux"
 
 	"k8s.io/kubernetes/pkg/api"
@@ -85,12 +85,12 @@ func listServicesByNamespace(namespace string) (*api.ServiceList, error) {
 	list, err := client.Services(namespace).List(api.ListOptions{})
 
 	if err != nil {
-		glog.Error("[listServicesByNamespace] error listing services", err)
+		log.Println("[listServicesByNamespace] error listing services", err)
 		return nil, err
 	}
 
 	if len(list.Items) == 0 {
-		glog.Info("[listServicesByNamespace] No services could be found for namespace!", namespace)
+		log.Println("[listServicesByNamespace] No services could be found for namespace!", namespace)
 	}
 
 	return list, nil
@@ -102,12 +102,12 @@ func listServices(namespace, labelKey, labelValue string) (*api.ServiceList, err
 	list, err := client.Services(namespace).List(listOptions)
 
 	if err != nil {
-		glog.Error("[listServices] Error listing services", err)
+		log.Println("[listServices] Error listing services", err)
 		return nil, err
 	}
 
 	if len(list.Items) == 0 {
-		glog.Info("[listServices] No services could be found for namespace:", namespace, " labelKey: ", labelKey, " labelValue: ", labelValue)
+		log.Println("[listServices] No services could be found for namespace:", namespace, " labelKey: ", labelKey, " labelValue: ", labelValue)
 	}
 
 	return list, nil
@@ -117,7 +117,7 @@ func getService(serviceName, namespace string) (*api.Service, error) {
 	svc, err := client.Services(namespace).Get(serviceName)
 
 	if err != nil {
-		glog.Error("[getService] Error getting service!", err)
+		log.Println("[getService] Error getting service!", err)
 		return nil, err
 	}
 
@@ -128,7 +128,7 @@ func createService(namespace string, svc *api.Service) error {
 	_, err := client.Services(namespace).Create(svc)
 
 	if err != nil {
-		glog.Error("[createService] Error creating service:", err)
+		log.Println("[createService] Error creating service:", err)
 	}
 	return err
 }
@@ -137,7 +137,7 @@ func deleteService(namespace, name string) error {
 	err := client.Services(namespace).Delete(name)
 
 	if err != nil {
-		glog.Error("[deleteService] Error deleting service:", err)
+		log.Println("[deleteService] Error deleting service:", err)
 	}
 	return err
 }
