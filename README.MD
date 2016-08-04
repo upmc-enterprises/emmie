@@ -32,7 +32,7 @@ _NOTE: Include a token query string to end of all requests for simple auth._
 * Deploy Emmie to your cluster ([See samples](k8s))
 * Create template namespace
 * Deploy template services / replication controllers
-  * _NOTE: Make sure your templates have correct Annotations on them for what to deploy (See [Annotations](#Annotations) section below)._
+  * _NOTE: Make sure your templates have correct Annotations on them for what to deploy (See [Annotations](#annotations) section below)._
 * Configure CI to build feature branch images
 * Configure CI to curl Emmie and deploy new namespace
 * Bask in the glory of how your team will produce better well tested code
