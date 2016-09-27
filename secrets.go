@@ -33,9 +33,10 @@ import (
 
 	"github.com/gorilla/mux"
 
-	"k8s.io/kubernetes/pkg/api"
-	"k8s.io/kubernetes/pkg/fields"
-	"k8s.io/kubernetes/pkg/labels"
+	"k8s.io/client-go/1.4/pkg/api"
+	"k8s.io/client-go/1.4/pkg/api/v1"
+	"k8s.io/client-go/1.4/pkg/fields"
+	"k8s.io/client-go/1.4/pkg/labels"
 )
 
 func getSecretRoute(w http.ResponseWriter, r *http.Request) {
@@ -81,8 +82,8 @@ func getSecretsRoute(w http.ResponseWriter, r *http.Request) {
 	}
 }
 
-func listSecretsByNamespace(namespace string) (*api.SecretList, error) {
-	list, err := client.Secrets(namespace).List(api.ListOptions{})
+func listSecretsByNamespace(namespace string) (*v1.SecretList, error) {
+	list, err := client.Core().Secrets(namespace).List(api.ListOptions{})
 
 	if err != nil {
 		log.Println("[listSecretsByNamespace] error listing secrets", err)
@@ -96,10 +97,10 @@ func listSecretsByNamespace(namespace string) (*api.SecretList, error) {
 	return list, nil
 }
 
-func listSecrets(namespace, labelKey, labelValue string) (*api.SecretList, error) {
+func listSecrets(namespace, labelKey, labelValue string) (*v1.SecretList, error) {
 	selector := labels.Set{labelKey: labelValue}.AsSelector()
 	listOptions := api.ListOptions{FieldSelector: fields.Everything(), LabelSelector: selector}
-	list, err := client.Secrets(namespace).List(listOptions)
+	list, err := client.Core().Secrets(namespace).List(listOptions)
 
 	if err != nil {
 		log.Println("[listSecrets] Error listing secrets", err)
@@ -113,8 +114,8 @@ func listSecrets(namespace, labelKey, labelValue string) (*api.SecretList, error
 	return list, nil
 }
 
-func getSecret(secretName, namespace string) (*api.Secret, error) {
-	svc, err := client.Secrets(namespace).Get(secretName)
+func getSecret(secretName, namespace string) (*v1.Secret, error) {
+	svc, err := client.Core().Secrets(namespace).Get(secretName)
 
 	if err != nil {
 		log.Println("[getSecret] Error getting secret!", err)
@@ -124,8 +125,8 @@ func getSecret(secretName, namespace string) (*api.Secret, error) {
 	return svc, nil
 }
 
-func createSecret(namespace string, secret *api.Secret) error {
-	_, err := client.Secrets(namespace).Create(secret)
+func createSecret(namespace string, secret *v1.Secret) error {
+	_, err := client.Core().Secrets(namespace).Create(secret)
 
 	if err != nil {
 		log.Println("[createSecret] Error creating secret:", err)
@@ -134,7 +135,8 @@ func createSecret(namespace string, secret *api.Secret) error {
 }
 
 func deleteSecret(namespace, name string) error {
-	err := client.Secrets(namespace).Delete(name)
+	// TODO: Use nil?
+	err := client.Secrets(namespace).Delete(name, nil)
 
 	if err != nil {
 		log.Println("[deleteSecret] Error deleting secret:", err)
