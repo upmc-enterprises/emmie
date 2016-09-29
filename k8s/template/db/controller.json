@@ -20,7 +20,7 @@
         "containers": [
           {
             "name": "db",
-            "image": "stevesloka/mysql",
+            "image": "mysql",
             "ports": [
               {
                 "name": "mysql-server",

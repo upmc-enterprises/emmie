@@ -31,9 +31,10 @@ import (
 	"log"
 	"net/http"
 
-	"k8s.io/kubernetes/pkg/api"
-	"k8s.io/kubernetes/pkg/fields"
-	"k8s.io/kubernetes/pkg/labels"
+	"k8s.io/client-go/1.4/pkg/api"
+	"k8s.io/client-go/1.4/pkg/api/v1"
+	"k8s.io/client-go/1.4/pkg/fields"
+	"k8s.io/client-go/1.4/pkg/labels"
 )
 
 // createNamespace creates a new namespace
@@ -42,11 +43,11 @@ func createNamespace(name string) error {
 	m := make(map[string]string)
 	m["deployedBy"] = "emmie"
 
-	ns := &api.Namespace{
-		ObjectMeta: api.ObjectMeta{Name: name, Labels: m},
+	ns := &v1.Namespace{
+		ObjectMeta: v1.ObjectMeta{Name: name, Labels: m},
 	}
 
-	_, err := client.Namespaces().Create(ns)
+	_, err := client.Core().Namespaces().Create(ns)
 
 	if err != nil {
 		log.Println("[createNamespace] Error creating namespace", err)
@@ -57,7 +58,7 @@ func createNamespace(name string) error {
 }
 
 // listNamespaces by label
-func listNamespaces(labelKey, labelValue string) (*api.NamespaceList, error) {
+func listNamespaces(labelKey, labelValue string) (*v1.NamespaceList, error) {
 	selector := labels.Set{labelKey: labelValue}.AsSelector()
 	listOptions := api.ListOptions{FieldSelector: fields.Everything(), LabelSelector: selector}
 	list, err := client.Namespaces().List(listOptions)
@@ -76,7 +77,8 @@ func listNamespaces(labelKey, labelValue string) (*api.NamespaceList, error) {
 
 // deleteNamespace delete a namespace
 func deleteNamespace(name string) {
-	err := client.Namespaces().Delete(name)
+	// TODO: Use nil as DeleteOptions?
+	err := client.Namespaces().Delete(name, nil)
 
 	if err != nil {
 		log.Println("[deleteNamespace] Error deleting namespace", err)

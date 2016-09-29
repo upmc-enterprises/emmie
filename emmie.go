@@ -32,16 +32,14 @@ import (
 	"fmt"
 	"log"
 	"net/http"
-	"net/url"
 	"os"
 	"strings"
 	"time"
 
 	"github.com/gorilla/mux"
-	"k8s.io/kubernetes/pkg/api"
-	"k8s.io/kubernetes/pkg/client/restclient"
-	kclient "k8s.io/kubernetes/pkg/client/unversioned"
-	kclientcmd "k8s.io/kubernetes/pkg/client/unversioned/clientcmd"
+	"k8s.io/client-go/1.4/kubernetes"
+	"k8s.io/client-go/1.4/pkg/api/v1"
+	"k8s.io/client-go/1.4/tools/clientcmd"
 )
 
 var (
@@ -51,55 +49,13 @@ var (
 	argKubeMasterURL     = flag.String("kube-master-url", "", "URL to reach kubernetes master. Env variables in this flag will be expanded.")
 	argTemplateNamespace = flag.String("template-namespace", "template", "Namespace to 'clone from when creating new deployments'")
 	argPathToTokens      = flag.String("path-to-tokens", "", "Full path including file name to tokens file for authorization, setting to empty string will disable.")
-	client               *kclient.Client
+	client               *kubernetes.Clientset
+	defaultReplicaCount  *int32
 )
 
 const (
-	appVersion = "0.0.2"
+	appVersion = "0.0.3"
 )
-
-func expandKubeMasterURL() (string, error) {
-	parsedURL, err := url.Parse(os.ExpandEnv(*argKubeMasterURL))
-	if err != nil {
-		return "", fmt.Errorf("failed to parse --kube_master_url %s - %v", *argKubeMasterURL, err)
-	}
-	if parsedURL.Scheme == "" || parsedURL.Host == "" || parsedURL.Host == ":" {
-		return "", fmt.Errorf("invalid --kube_master_url specified %s", *argKubeMasterURL)
-	}
-	return parsedURL.String(), nil
-}
-
-func newKubeClient() (*kclient.Client, error) {
-	var (
-		config    *restclient.Config
-		err       error
-		masterURL string
-	)
-
-	if *argKubeMasterURL != "" {
-		masterURL, err = expandKubeMasterURL()
-
-		if err != nil {
-			return nil, err
-		}
-	}
-
-	if masterURL != "" && *argKubecfgFile == "" {
-		config = &restclient.Config{
-			Host: masterURL,
-		}
-	} else {
-		overrides := &kclientcmd.ConfigOverrides{}
-		overrides.ClusterInfo.Server = masterURL
-		rules := &kclientcmd.ClientConfigLoadingRules{ExplicitPath: *argKubecfgFile}
-		if config, err = kclientcmd.NewNonInteractiveDeferredLoadingClientConfig(rules, overrides).ClientConfig(); err != nil {
-			return nil, err
-		}
-	}
-
-	log.Println(fmt.Sprintf("Using %s for kubernetes master", config.Host))
-	return kclient.New(config)
-}
 
 // Default (GET "/")
 func indexRoute(w http.ResponseWriter, r *http.Request) {
@@ -159,8 +115,8 @@ func deployRoute(w http.ResponseWriter, r *http.Request) {
 		// create configmaps
 		for _, configmap := range configmaps.Items {
 
-			requestConfigMap := &api.ConfigMap{
-				ObjectMeta: api.ObjectMeta{
+			requestConfigMap := &v1.ConfigMap{
+				ObjectMeta: v1.ObjectMeta{
 					Name:      configmap.Name,
 					Namespace: branchName,
 				},
@@ -176,8 +132,8 @@ func deployRoute(w http.ResponseWriter, r *http.Request) {
 			// skip service accounts
 			if secret.Type != "kubernetes.io/service-account-token" {
 
-				requestSecret := &api.Secret{
-					ObjectMeta: api.ObjectMeta{
+				requestSecret := &v1.Secret{
+					ObjectMeta: v1.ObjectMeta{
 						Name:      secret.Name,
 						Namespace: branchName,
 					},
@@ -196,17 +152,17 @@ func deployRoute(w http.ResponseWriter, r *http.Request) {
 			annotations := make(map[string]string)
 			annotations["router.deis.io/domains"] = fmt.Sprintf("%s,www.%s.local.k8s.com", branchName, branchName)
 
-			requestService := &api.Service{
-				ObjectMeta: api.ObjectMeta{
+			requestService := &v1.Service{
+				ObjectMeta: v1.ObjectMeta{
 					Name:        svc.ObjectMeta.Name,
 					Namespace:   branchName,
 					Annotations: annotations,
 				},
 			}
 
-			ports := []api.ServicePort{}
+			ports := []v1.ServicePort{}
 			for _, port := range svc.Spec.Ports {
-				newPort := api.ServicePort{
+				newPort := v1.ServicePort{
 					Name:       port.Name,
 					Protocol:   port.Protocol,
 					Port:       port.Port,
@@ -253,15 +209,15 @@ func deployRoute(w http.ResponseWriter, r *http.Request) {
 				rc.Spec.Template.Spec.Containers[i].ImagePullPolicy = "Always"
 			}
 
-			requestController := &api.ReplicationController{
-				ObjectMeta: api.ObjectMeta{
+			requestController := &v1.ReplicationController{
+				ObjectMeta: v1.ObjectMeta{
 					Name:      rc.ObjectMeta.Name,
 					Namespace: branchName,
 				},
 			}
 
 			requestController.Spec = rc.Spec
-			requestController.Spec.Replicas = 1
+			requestController.Spec.Replicas = defaultReplicaCount
 
 			// create new replication controller
 			createReplicationController(branchName, requestController)
@@ -390,12 +346,20 @@ func main() {
 	router.HandleFunc("/version", versionRoute)
 
 	// Create k8s client
-	kubeClient, err := newKubeClient()
+	//config, err := rest.InClusterConfig()
+	config, err := clientcmd.BuildConfigFromFlags("", *argKubecfgFile)
 	if err != nil {
-		log.Println("Failed to create a kubernetes client: %v", err)
+		panic(err.Error())
 	}
-	client = kubeClient
+	// creates the clientset
+	clientset, err := kubernetes.NewForConfig(config)
+	if err != nil {
+		panic(err.Error())
+	}
+
+	client = clientset
 
 	// Start server
-	log.Fatal(http.ListenAndServeTLS(fmt.Sprintf(":%d", *argListenPort), "certs/cert.pem", "certs/key.pem", router))
+	//log.Fatal(http.ListenAndServeTLS(fmt.Sprintf(":%d", *argListenPort), "certs/cert.pem", "certs/key.pem", router))
+	log.Fatal(http.ListenAndServe(fmt.Sprintf(":%d", *argListenPort), router))
 }

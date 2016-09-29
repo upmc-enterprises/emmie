@@ -29,11 +29,12 @@ package main
 import (
 	"log"
 
-	"k8s.io/kubernetes/pkg/api"
+	api "k8s.io/client-go/1.4/pkg/api"
+	v1 "k8s.io/client-go/1.4/pkg/api/v1"
 )
 
-func deletePodsByNamespace(namespace string) (*api.PodList, error) {
-	list, err := client.Pods(namespace).List(api.ListOptions{})
+func deletePodsByNamespace(namespace string) (*v1.PodList, error) {
+	list, err := client.Core().Pods(namespace).List(api.ListOptions{})
 
 	if err != nil {
 		log.Println("[deletePodsByNamespace] Error deleting pods", err)
@@ -49,7 +50,7 @@ func deletePodsByNamespace(namespace string) (*api.PodList, error) {
 }
 
 func deletePod(namespace, podName string) error {
-	err := client.Pods(namespace).Delete(podName, nil)
+	err := client.Core().Pods(namespace).Delete(podName, nil)
 
 	if err != nil {
 		log.Println("[deletePod] Could not delete pod:", podName)

@@ -33,9 +33,10 @@ import (
 
 	"github.com/gorilla/mux"
 
-	"k8s.io/kubernetes/pkg/api"
-	"k8s.io/kubernetes/pkg/fields"
-	"k8s.io/kubernetes/pkg/labels"
+	"k8s.io/client-go/1.4/pkg/api"
+	"k8s.io/client-go/1.4/pkg/api/v1"
+	"k8s.io/client-go/1.4/pkg/fields"
+	"k8s.io/client-go/1.4/pkg/labels"
 )
 
 func getServiceRoute(w http.ResponseWriter, r *http.Request) {
@@ -81,8 +82,8 @@ func getServicesRoute(w http.ResponseWriter, r *http.Request) {
 	}
 }
 
-func listServicesByNamespace(namespace string) (*api.ServiceList, error) {
-	list, err := client.Services(namespace).List(api.ListOptions{})
+func listServicesByNamespace(namespace string) (*v1.ServiceList, error) {
+	list, err := client.Core().Services(namespace).List(api.ListOptions{})
 
 	if err != nil {
 		log.Println("[listServicesByNamespace] error listing services", err)
@@ -96,10 +97,10 @@ func listServicesByNamespace(namespace string) (*api.ServiceList, error) {
 	return list, nil
 }
 
-func listServices(namespace, labelKey, labelValue string) (*api.ServiceList, error) {
+func listServices(namespace, labelKey, labelValue string) (*v1.ServiceList, error) {
 	selector := labels.Set{labelKey: labelValue}.AsSelector()
 	listOptions := api.ListOptions{FieldSelector: fields.Everything(), LabelSelector: selector}
-	list, err := client.Services(namespace).List(listOptions)
+	list, err := client.Core().Services(namespace).List(listOptions)
 
 	if err != nil {
 		log.Println("[listServices] Error listing services", err)
@@ -113,8 +114,8 @@ func listServices(namespace, labelKey, labelValue string) (*api.ServiceList, err
 	return list, nil
 }
 
-func getService(serviceName, namespace string) (*api.Service, error) {
-	svc, err := client.Services(namespace).Get(serviceName)
+func getService(serviceName, namespace string) (*v1.Service, error) {
+	svc, err := client.Core().Services(namespace).Get(serviceName)
 
 	if err != nil {
 		log.Println("[getService] Error getting service!", err)
@@ -124,8 +125,8 @@ func getService(serviceName, namespace string) (*api.Service, error) {
 	return svc, nil
 }
 
-func createService(namespace string, svc *api.Service) error {
-	_, err := client.Services(namespace).Create(svc)
+func createService(namespace string, svc *v1.Service) error {
+	_, err := client.Core().Services(namespace).Create(svc)
 
 	if err != nil {
 		log.Println("[createService] Error creating service:", err)
@@ -134,7 +135,8 @@ func createService(namespace string, svc *api.Service) error {
 }
 
 func deleteService(namespace, name string) error {
-	err := client.Services(namespace).Delete(name)
+	// TODO: nil?
+	err := client.Core().Services(namespace).Delete(name, nil)
 
 	if err != nil {
 		log.Println("[deleteService] Error deleting service:", err)

@@ -33,9 +33,10 @@ import (
 
 	"github.com/gorilla/mux"
 
-	"k8s.io/kubernetes/pkg/api"
-	"k8s.io/kubernetes/pkg/fields"
-	"k8s.io/kubernetes/pkg/labels"
+	"k8s.io/client-go/1.4/pkg/api"
+	"k8s.io/client-go/1.4/pkg/api/v1"
+	"k8s.io/client-go/1.4/pkg/fields"
+	"k8s.io/client-go/1.4/pkg/labels"
 )
 
 func getReplicationControllerRoute(w http.ResponseWriter, r *http.Request) {
@@ -81,8 +82,8 @@ func getReplicationControllersRoute(w http.ResponseWriter, r *http.Request) {
 	}
 }
 
-func listReplicationControllersByNamespace(namespace string) (*api.ReplicationControllerList, error) {
-	list, err := client.ReplicationControllers(namespace).List(api.ListOptions{})
+func listReplicationControllersByNamespace(namespace string) (*v1.ReplicationControllerList, error) {
+	list, err := client.Core().ReplicationControllers(namespace).List(api.ListOptions{})
 
 	if err != nil {
 		log.Println("[listReplicationControllersByNamespace] Error listing replicationControllers", err)
@@ -91,10 +92,10 @@ func listReplicationControllersByNamespace(namespace string) (*api.ReplicationCo
 	return list, nil
 }
 
-func listReplicationControllers(namespace, labelKey, labelValue string) (*api.ReplicationControllerList, error) {
+func listReplicationControllers(namespace, labelKey, labelValue string) (*v1.ReplicationControllerList, error) {
 	selector := labels.Set{labelKey: labelValue}.AsSelector()
 	listOptions := api.ListOptions{FieldSelector: fields.Everything(), LabelSelector: selector}
-	list, err := client.ReplicationControllers(namespace).List(listOptions)
+	list, err := client.Core().ReplicationControllers(namespace).List(listOptions)
 
 	if err != nil {
 		log.Println("[listReplicationControllers] Error listing replicationControllers", err)
@@ -103,8 +104,8 @@ func listReplicationControllers(namespace, labelKey, labelValue string) (*api.Re
 	return list, nil
 }
 
-func getReplicationController(replicationControllerName, namespace string) (*api.ReplicationController, error) {
-	rc, err := client.ReplicationControllers(namespace).Get(replicationControllerName)
+func getReplicationController(replicationControllerName, namespace string) (*v1.ReplicationController, error) {
+	rc, err := client.Core().ReplicationControllers(namespace).Get(replicationControllerName)
 
 	if err != nil {
 		log.Println("[getReplicationController] Error getting replicationController", err)
@@ -113,8 +114,8 @@ func getReplicationController(replicationControllerName, namespace string) (*api
 	return rc, nil
 }
 
-func createReplicationController(namespace string, rc *api.ReplicationController) error {
-	_, err := client.ReplicationControllers(namespace).Create(rc)
+func createReplicationController(namespace string, rc *v1.ReplicationController) error {
+	_, err := client.Core().ReplicationControllers(namespace).Create(rc)
 
 	if err != nil {
 		log.Println("[createReplicationController] Error creating replicationController:", err)
@@ -123,7 +124,8 @@ func createReplicationController(namespace string, rc *api.ReplicationController
 }
 
 func deleteReplicationController(namespace, name string) error {
-	err := client.ReplicationControllers(namespace).Delete(name)
+	// TODO: Use nil?
+	err := client.ReplicationControllers(namespace).Delete(name, nil)
 
 	if err != nil {
 		log.Println("[deleteReplicationController] Error deleting replicationController:", err)

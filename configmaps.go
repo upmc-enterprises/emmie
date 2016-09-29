@@ -31,11 +31,12 @@ import (
 	"log"
 	"net/http"
 
-	"github.com/gorilla/mux"
+	"k8s.io/client-go/1.4/pkg/api"
+	"k8s.io/client-go/1.4/pkg/api/v1"
+	"k8s.io/client-go/1.4/pkg/fields"
+	"k8s.io/client-go/1.4/pkg/labels"
 
-	"k8s.io/kubernetes/pkg/api"
-	"k8s.io/kubernetes/pkg/fields"
-	"k8s.io/kubernetes/pkg/labels"
+	"github.com/gorilla/mux"
 )
 
 func getConfigMapRoute(w http.ResponseWriter, r *http.Request) {
@@ -81,8 +82,8 @@ func getConfigMapsRoute(w http.ResponseWriter, r *http.Request) {
 	}
 }
 
-func listConfigMapsByNamespace(namespace string) (*api.ConfigMapList, error) {
-	list, err := client.ConfigMaps(namespace).List(api.ListOptions{})
+func listConfigMapsByNamespace(namespace string) (*v1.ConfigMapList, error) {
+	list, err := client.Core().ConfigMaps(namespace).List(api.ListOptions{})
 
 	if err != nil {
 		log.Println("[listConfigMapsByNamespace] error listing ConfigMaps", err)
@@ -96,10 +97,10 @@ func listConfigMapsByNamespace(namespace string) (*api.ConfigMapList, error) {
 	return list, nil
 }
 
-func listConfigMaps(namespace, labelKey, labelValue string) (*api.ConfigMapList, error) {
+func listConfigMaps(namespace, labelKey, labelValue string) (*v1.ConfigMapList, error) {
 	selector := labels.Set{labelKey: labelValue}.AsSelector()
 	listOptions := api.ListOptions{FieldSelector: fields.Everything(), LabelSelector: selector}
-	list, err := client.ConfigMaps(namespace).List(listOptions)
+	list, err := client.Core().ConfigMaps(namespace).List(listOptions)
 
 	if err != nil {
 		log.Println("[listConfigMaps] Error listing ConfigMaps", err)
@@ -113,7 +114,7 @@ func listConfigMaps(namespace, labelKey, labelValue string) (*api.ConfigMapList,
 	return list, nil
 }
 
-func getConfigMap(ConfigMapName, namespace string) (*api.ConfigMap, error) {
+func getConfigMap(ConfigMapName, namespace string) (*v1.ConfigMap, error) {
 	svc, err := client.ConfigMaps(namespace).Get(ConfigMapName)
 
 	if err != nil {
@@ -124,8 +125,8 @@ func getConfigMap(ConfigMapName, namespace string) (*api.ConfigMap, error) {
 	return svc, nil
 }
 
-func createConfigMap(namespace string, ConfigMap *api.ConfigMap) error {
-	_, err := client.ConfigMaps(namespace).Create(ConfigMap)
+func createConfigMap(namespace string, ConfigMap *v1.ConfigMap) error {
+	_, err := client.Core().ConfigMaps(namespace).Create(ConfigMap)
 
 	if err != nil {
 		log.Println("[createConfigMap] Error creating ConfigMap:", err)
@@ -134,7 +135,8 @@ func createConfigMap(namespace string, ConfigMap *api.ConfigMap) error {
 }
 
 func deleteConfigMap(namespace, name string) error {
-	err := client.ConfigMaps(namespace).Delete(name)
+	// TODO: nil on the DeleteOptions?
+	err := client.Core().ConfigMaps(namespace).Delete(name, nil)
 
 	if err != nil {
 		log.Println("[deleteConfigMap] Error deleting ConfigMap:", err)
