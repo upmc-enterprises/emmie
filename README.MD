@@ -1,3 +1,5 @@
+[![Build Status](https://travis-ci.org/upmc-enterprises/emmie.svg?branch=addCI)](https://travis-ci.org/upmc-enterprises/emmie)
+
 ## "Emmie" is a deployment tool to facilitate deployments of applications to a Kubernetes cluster
 Emmie assists with creating unique and isolated environments for each feature being worked on within an application. This allows for easier testing since the entire application is stood up and doesn't rely on brittle mocks or fake components.
 
