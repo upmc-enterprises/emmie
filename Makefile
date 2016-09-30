@@ -10,7 +10,7 @@ PREFIX = stevesloka
 all: container
 
 emmie: emmie.go pods.go replicationControllers.go services.go namespaces.go secrets.go configmaps.go deployments.go
-	GOOS=linux GOARCH=amd64 CGO_ENABLED=0 go build -a -installsuffix cgo --ldflags '-w' ./emmie.go ./pods.go ./replicationControllers.go ./services.go ./namespaces.go ./secrets.go ./configmaps.go
+	GOOS=linux GOARCH=amd64 CGO_ENABLED=0 go build -a -installsuffix cgo --ldflags '-w' ./emmie.go ./pods.go ./replicationControllers.go ./services.go ./namespaces.go ./secrets.go ./configmaps.go ./deployments.go
 
 container: emmie
 	docker build -t $(PREFIX)/emmie:$(TAG) .
