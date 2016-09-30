@@ -39,6 +39,7 @@ import (
 	"github.com/gorilla/mux"
 	"k8s.io/client-go/1.4/kubernetes"
 	"k8s.io/client-go/1.4/pkg/api/v1"
+	"k8s.io/client-go/1.4/pkg/apis/extensions/v1beta1"
 	"k8s.io/client-go/1.4/tools/clientcmd"
 )
 
@@ -102,6 +103,9 @@ func deployRoute(w http.ResponseWriter, r *http.Request) {
 		// copy controllers / services based on label query
 		rcs, _ := listReplicationControllersByNamespace(*argTemplateNamespace)
 		log.Println("Found ", len(rcs.Items), " template replication controllers to copy.")
+
+		deployments, _ := listDeploymentsByNamespace(*argTemplateNamespace)
+		log.Println("Found ", len(deployments.Items), " template deployments to copy.")
 
 		svcs, _ := listServicesByNamespace(*argTemplateNamespace)
 		log.Println("Found ", len(svcs.Items), " template services to copy.")
@@ -222,6 +226,50 @@ func deployRoute(w http.ResponseWriter, r *http.Request) {
 			// create new replication controller
 			createReplicationController(branchName, requestController)
 		}
+
+		// now that we have all deployments, update them to have new image name
+		for _, dply := range deployments.Items {
+
+			containerNameToUpdate := ""
+
+			// Looks for annotations to know which container to replace
+			for key, value := range dply.Annotations {
+				if key == "emmie-update" {
+					containerNameToUpdate = value
+				}
+			}
+
+			// Find the container which matches the annotation
+			for i, container := range dply.Spec.Template.Spec.Containers {
+
+				imageName := ""
+
+				if containerNameToUpdate == "" {
+					//default to current image tag if no annotations found
+					imageName = container.Image
+				} else {
+					imageName = fmt.Sprintf("%s%s/%s:%s", *argDockerRegistry, imageNamespace, dply.ObjectMeta.Labels["name"], branchName)
+				}
+
+				dply.Spec.Template.Spec.Containers[i].Image = imageName
+
+				// Set the image pull policy to "Always"
+				dply.Spec.Template.Spec.Containers[i].ImagePullPolicy = "Always"
+			}
+
+			deployment := &v1beta1.Deployment{
+				ObjectMeta: v1.ObjectMeta{
+					Name:      dply.ObjectMeta.Name,
+					Namespace: branchName,
+				},
+			}
+
+			deployment.Spec = dply.Spec
+			deployment.Spec.Replicas = defaultReplicaCount
+
+			// create new replication controller
+			createDeployment(branchName, deployment)
+		}
 	}
 	log.Println("[Emmie] is finished deploying branch!")
 }
@@ -261,10 +309,15 @@ func deleteRoute(w http.ResponseWriter, r *http.Request) {
 
 	// get controllers / services / secrets in namespace
 	rcs, _ := listReplicationControllersByNamespace(*argTemplateNamespace)
-
 	for _, rc := range rcs.Items {
 		deleteReplicationController(branchName, rc.ObjectMeta.Name)
 		log.Println("Deleted replicationController:", rc.ObjectMeta.Name)
+	}
+
+	deployments, _ := listDeploymentsByNamespace(*argTemplateNamespace)
+	for _, dply := range deployments.Items {
+		deleteDeployment(branchName, dply.ObjectMeta.Name)
+		log.Println("Deleted deployment:", dply.ObjectMeta.Name)
 	}
 
 	svcs, _ := listServicesByNamespace(*argTemplateNamespace)
@@ -339,8 +392,12 @@ func main() {
 	// router.HandleFunc("/services/{namespace}/{key}/{value}", getServicesRoute).Methods("GET")
 
 	// ReplicationControllers
-	router.HandleFunc("/replicationControllers/{namespace}/{rcName}", getReplicationControllerRoute).Methods("GET")
+	// router.HandleFunc("/replicationControllers/{namespace}/{rcName}", getReplicationControllerRoute).Methods("GET")
 	// router.HandleFunc("/replicationControllers/{namespace}/{key}/{value}", getReplicationControllersRoute).Methods("GET")
+
+	// Deployments
+	// router.HandleFunc("/deployments/{namespace}/{deploymentName}", getDeploymentRoute).Methods("GET")
+	// router.HandleFunc("/deployments/{namespace}/{key}/{value}", getDeploymentsRoute).Methods("GET")
 
 	// Version
 	router.HandleFunc("/version", versionRoute)
@@ -351,6 +408,7 @@ func main() {
 	if err != nil {
 		panic(err.Error())
 	}
+
 	// creates the clientset
 	clientset, err := kubernetes.NewForConfig(config)
 	if err != nil {
