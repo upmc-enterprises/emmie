@@ -88,7 +88,7 @@ func deleteNamespace(name string) {
 	log.Println("Deleted namespace:", name)
 }
 
-func getDeploymentsRoute(w http.ResponseWriter, r *http.Request) {
+func getNamespacesRoute(w http.ResponseWriter, r *http.Request) {
 	nss, err := listNamespaces("deployedBy", "emmie")
 
 	w.Header().Set("Content-Type", "application/json; charset=UTF-8")
