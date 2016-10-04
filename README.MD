@@ -10,11 +10,8 @@ Emmie assists with creating unique and isolated environments for each feature be
 * Deploy all replication controllers and services to a template namespace. This can be a new namespace or configured to be "develop" branch
 
 ### Application Arguments:
-* listen-port: Port Emmie will listen on to take requests
+* listen-port: Port Emmie will listen on to take requests (NOTE: Only listents on HTTPS)
 * docker-registry: Set to url of private docker registry
-* kubecfg-file: Location of kubecfg file for access to kubernetes master service
-* kube-master-url:  overrides the URL part of this; if neither this nor --kube_master_url are provided, defaults to service account tokens
-* kube-master-url: URL to reach kubernetes master. Env variables in this flag will be expanded
 * template-namespace: Namespace to 'clone from when creating new deployments'
 * path-to-tokens: Full path including file name to tokens file for authorization, setting to empty string will disable.
 
@@ -31,7 +28,9 @@ _NOTE: Include a token query string to end of all requests for simple auth._
 
 ## Get Started
 1. Create auth tokens file
+* Generate certs
 * Deploy Emmie to your cluster ([See samples](k8s))
+* Deploy Router to your cluster (`kubectl create -f k8s/router.yml`)
 * Create template namespace
 * Deploy template services / replication controllers
   * _NOTE: Make sure your templates have correct Annotations on them for what to deploy (See [Annotations](#annotations) section below)._
@@ -41,7 +40,7 @@ _NOTE: Include a token query string to end of all requests for simple auth._
 
 ### Annotations
 
-Since a pod can be made up of many containers, an annation is required to tell Emmie how to update that pod when deploying new code. In the example below, Emmie looks for the key `emmie-update` and uses the value to find the container name to replace. In this case the container named `web` in the pod will be updated with the feature branch deploy.
+Since a pod can be made up of many containers, an annotation is required to tell Emmie how to update that pod when deploying new code. In the example below, Emmie looks for the key `emmie-update` and uses the value to find the container name to replace. In this case the container named `web` in the pod will be updated with the feature branch deploy.
 
 ```
 annotations:
@@ -59,7 +58,7 @@ Watch a demo here:<br>
 
 ## Gotchas
 * Do not have network mounts or host mounts, for now this proves difficult to manage via the template system
-* If multiple containers are used in a single pod, make sure the image that needs updated is the first in the collection
+* If multiple containers are used in a single pod, make sure annotate
 
 ## About
 Built by UPMC Enterprises in Pittsburgh, PA.
