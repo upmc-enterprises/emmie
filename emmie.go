@@ -40,7 +40,7 @@ import (
 	"k8s.io/client-go/1.4/kubernetes"
 	"k8s.io/client-go/1.4/pkg/api/v1"
 	"k8s.io/client-go/1.4/pkg/apis/extensions/v1beta1"
-	"k8s.io/client-go/1.4/tools/clientcmd"
+	"k8s.io/client-go/1.4/rest"
 )
 
 var (
@@ -403,8 +403,8 @@ func main() {
 	router.HandleFunc("/version", versionRoute)
 
 	// Create k8s client
-	//config, err := rest.InClusterConfig()
-	config, err := clientcmd.BuildConfigFromFlags("", *argKubecfgFile)
+	config, err := rest.InClusterConfig()
+	//config, err := clientcmd.BuildConfigFromFlags("", *argKubecfgFile)
 	if err != nil {
 		panic(err.Error())
 	}
@@ -418,6 +418,6 @@ func main() {
 	client = clientset
 
 	// Start server
-	//log.Fatal(http.ListenAndServeTLS(fmt.Sprintf(":%d", *argListenPort), "certs/cert.pem", "certs/key.pem", router))
-	log.Fatal(http.ListenAndServe(fmt.Sprintf(":%d", *argListenPort), router))
+	log.Fatal(http.ListenAndServeTLS(fmt.Sprintf(":%d", *argListenPort), "certs/cert.pem", "certs/key.pem", router))
+	//log.Fatal(http.ListenAndServe(fmt.Sprintf(":%d", *argListenPort), router))
 }
