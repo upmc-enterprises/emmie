@@ -40,7 +40,7 @@ import (
 	"k8s.io/client-go/1.4/kubernetes"
 	"k8s.io/client-go/1.4/pkg/api/v1"
 	"k8s.io/client-go/1.4/pkg/apis/extensions/v1beta1"
-	"k8s.io/client-go/1.4/tools/clientcmd"
+	"k8s.io/client-go/1.4/rest"
 )
 
 var (
@@ -50,6 +50,7 @@ var (
 	argKubeMasterURL     = flag.String("kube-master-url", "", "URL to reach kubernetes master. Env variables in this flag will be expanded.")
 	argTemplateNamespace = flag.String("template-namespace", "template", "Namespace to 'clone from when creating new deployments'")
 	argPathToTokens      = flag.String("path-to-tokens", "", "Full path including file name to tokens file for authorization, setting to empty string will disable.")
+	argSubDomain         = flag.String("subdomain", "k8s.local.com", "Subdomain used to configure external routing to branch (e.g. namespace.ci.k8s.local)")
 	client               *kubernetes.Clientset
 	defaultReplicaCount  *int32
 )
@@ -154,7 +155,10 @@ func deployRoute(w http.ResponseWriter, r *http.Request) {
 
 			// Create annotations for Deis router
 			annotations := make(map[string]string)
-			annotations["router.deis.io/domains"] = fmt.Sprintf("%s,www.%s.local.k8s.com", branchName, branchName)
+			annotations["router.deis.io/domains"] = fmt.Sprintf("%s,www.%s.%s", branchName, branchName, argSubDomain)
+
+			// Add Deis router label
+			svc.Labels["router.deis.io/routable"] = "true"
 
 			requestService := &v1.Service{
 				ObjectMeta: v1.ObjectMeta{
@@ -179,6 +183,7 @@ func deployRoute(w http.ResponseWriter, r *http.Request) {
 			requestService.Spec.Ports = ports
 			requestService.Spec.Selector = svc.Spec.Selector
 			requestService.Spec.Type = svc.Spec.Type
+			requestService.Labels = svc.Labels
 
 			createService(branchName, requestService)
 		}
@@ -403,8 +408,8 @@ func main() {
 	router.HandleFunc("/version", versionRoute)
 
 	// Create k8s client
-	//config, err := rest.InClusterConfig()
-	config, err := clientcmd.BuildConfigFromFlags("", *argKubecfgFile)
+	config, err := rest.InClusterConfig()
+	//config, err := clientcmd.BuildConfigFromFlags("", *argKubecfgFile)
 	if err != nil {
 		panic(err.Error())
 	}
@@ -418,6 +423,6 @@ func main() {
 	client = clientset
 
 	// Start server
-	//log.Fatal(http.ListenAndServeTLS(fmt.Sprintf(":%d", *argListenPort), "certs/cert.pem", "certs/key.pem", router))
-	log.Fatal(http.ListenAndServe(fmt.Sprintf(":%d", *argListenPort), router))
+	log.Fatal(http.ListenAndServeTLS(fmt.Sprintf(":%d", *argListenPort), "certs/cert.pem", "certs/key.pem", router))
+	//log.Fatal(http.ListenAndServe(fmt.Sprintf(":%d", *argListenPort), router))
 }

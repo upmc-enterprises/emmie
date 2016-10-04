@@ -4,6 +4,9 @@
   "metadata": {
     "name": "api",
     "namespace": "template",
+    "annotations": {
+      "emmie-update": "api"
+    },
     "labels": {
       "name": "api"
     }
