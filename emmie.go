@@ -153,12 +153,18 @@ func deployRoute(w http.ResponseWriter, r *http.Request) {
 		// create services
 		for _, svc := range svcs.Items {
 
-			// Create annotations for Deis router
 			annotations := make(map[string]string)
-			annotations["router.deis.io/domains"] = fmt.Sprintf("%s,www.%s.%s", branchName, branchName, *argSubDomain)
 
-			// Add Deis router label
-			svc.Labels["router.deis.io/routable"] = "true"
+			log.Println("STEVE: test")
+
+			// only make routable if we want it routable
+			if val, ok := svc.Labels["router.deis.io/routable"]; ok {
+				if val == "true" {
+					// Create annotations for Deis router
+					annotations["router.deis.io/domains"] = fmt.Sprintf("%s,www.%s.%s", branchName, branchName, *argSubDomain)
+					log.Println("Make service [%s] routable for namespace [%s]!", svc.Name, branchName)
+				}
+			}
 
 			requestService := &v1.Service{
 				ObjectMeta: v1.ObjectMeta{
