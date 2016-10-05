@@ -155,7 +155,7 @@ func deployRoute(w http.ResponseWriter, r *http.Request) {
 
 			// Create annotations for Deis router
 			annotations := make(map[string]string)
-			annotations["router.deis.io/domains"] = fmt.Sprintf("%s,www.%s.%s", branchName, branchName, argSubDomain)
+			annotations["router.deis.io/domains"] = fmt.Sprintf("%s,www.%s.%s", branchName, branchName, *argSubDomain)
 
 			// Add Deis router label
 			svc.Labels["router.deis.io/routable"] = "true"
