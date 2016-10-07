@@ -51,6 +51,13 @@ annotations:
 ## Generate Self-Signed cert
 `openssl req -x509 -newkey rsa:2048 -keyout key.pem -out cert.pem -days 365 -nodes`
 
+### Generate cert for Traefik
+
+```
+cd k8s/router
+openssl req -newkey rsa:2048 -nodes -keyout tls.key -x509 -days 365 -out tls.crt
+```
+
 ## Demo
 Watch a demo here:<br>
 [![Emmie Demo](http://img.youtube.com/vi/w7rshjxsojA/0.jpg)](http://www.youtube.com/watch?v=w7rshjxsojA)<br>

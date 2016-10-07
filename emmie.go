@@ -117,6 +117,9 @@ func deployRoute(w http.ResponseWriter, r *http.Request) {
 		configmaps, _ := listConfigMapsByNamespace(*argTemplateNamespace)
 		log.Println("Found ", len(configmaps.Items), " template configmaps to copy.")
 
+		ingresses, _ := listIngresssByNamespace(*argTemplateNamespace)
+		log.Println("Found ", len(ingresses.Items), " template ingresses to copy.")
+
 		// create configmaps
 		for _, configmap := range configmaps.Items {
 
@@ -153,24 +156,10 @@ func deployRoute(w http.ResponseWriter, r *http.Request) {
 		// create services
 		for _, svc := range svcs.Items {
 
-			annotations := make(map[string]string)
-
-			log.Println("STEVE: test")
-
-			// only make routable if we want it routable
-			if val, ok := svc.Labels["router.deis.io/routable"]; ok {
-				if val == "true" {
-					// Create annotations for Deis router
-					annotations["router.deis.io/domains"] = fmt.Sprintf("%s,www.%s.%s", branchName, branchName, *argSubDomain)
-					log.Println("Make service [%s] routable for namespace [%s]!", svc.Name, branchName)
-				}
-			}
-
 			requestService := &v1.Service{
 				ObjectMeta: v1.ObjectMeta{
-					Name:        svc.ObjectMeta.Name,
-					Namespace:   branchName,
-					Annotations: annotations,
+					Name:      svc.ObjectMeta.Name,
+					Namespace: branchName,
 				},
 			}
 
@@ -281,6 +270,25 @@ func deployRoute(w http.ResponseWriter, r *http.Request) {
 			// create new replication controller
 			createDeployment(branchName, deployment)
 		}
+
+		// create ingress
+		for _, ingress := range ingresses.Items {
+
+			rules := ingress.Spec.Rules
+			rules[0].Host = fmt.Sprintf("%s.%s", branchName, *argSubDomain)
+
+			requestIngress := &v1beta1.Ingress{
+				ObjectMeta: v1.ObjectMeta{
+					Name:      ingress.Name,
+					Namespace: branchName,
+				},
+				Spec: v1beta1.IngressSpec{
+					Rules: rules,
+				},
+			}
+
+			createIngress(branchName, requestIngress)
+		}
 	}
 	log.Println("[Emmie] is finished deploying branch!")
 }
@@ -347,6 +355,12 @@ func deleteRoute(w http.ResponseWriter, r *http.Request) {
 	for _, configmap := range configmaps.Items {
 		deleteSecret(branchName, configmap.ObjectMeta.Name)
 		log.Println("Deleted configmap:", configmap.ObjectMeta.Name)
+	}
+
+	ingresses, _ := listIngresssByNamespace(*argTemplateNamespace)
+	for _, ingress := range ingresses.Items {
+		deleteIngress(branchName, ingress.ObjectMeta.Name)
+		log.Println("Deleted ingress:", ingress.ObjectMeta.Name)
 	}
 
 	deleteNamespace(branchName)

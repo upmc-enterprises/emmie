@@ -1,0 +1,53 @@
+apiVersion: v1
+kind: ReplicationController
+metadata:
+  name: traefik-ingress-controller
+  labels:
+    app: traefik-ingress-lb
+spec:
+  replicas: 2
+  selector:
+  template:
+    metadata:
+      labels:
+        app: traefik-ingress-lb
+        name: traefik-ingress-lb
+    spec:
+      terminationGracePeriodSeconds: 60
+      volumes:
+      - name: ssl
+        secret:
+          secretName: traefik-cert
+      - name: config
+        configMap:
+          name: traefik-conf
+      containers:
+      - image: traefik
+        name: traefik-ingress-lb
+        imagePullPolicy: Always
+        volumeMounts:
+        - mountPath: "/ssl"
+          name: "ssl"
+        - mountPath: "/config"
+          name: "config"
+        ports:
+        - containerPort: 80
+        - containerPort: 443
+        args:
+        - --configfile=/config/traefik.toml
+        - --kubernetes
+        - --logLevel=DEBUG
+---
+kind: Service
+apiVersion: v1
+metadata:
+  name: traefik
+spec:
+  type: LoadBalancer
+  ports:
+  - port: 80
+    name: http
+  - port: 443
+    name: https
+  selector:
+    app: traefik-ingress-lb
