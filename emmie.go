@@ -200,11 +200,11 @@ func deployRoute(w http.ResponseWriter, r *http.Request) {
 
 				imageName := ""
 
-				if containerNameToUpdate == "" {
+				if containerNameToUpdate == rc.ObjectMeta.Name {
+					imageName = fmt.Sprintf("%s%s/%s:%s", *argDockerRegistry, imageNamespace, rc.ObjectMeta.Name, branchName)
+				} else {
 					//default to current image tag if no annotations found
 					imageName = container.Image
-				} else {
-					imageName = fmt.Sprintf("%s%s/%s:%s", *argDockerRegistry, imageNamespace, rc.ObjectMeta.Labels["name"], branchName)
 				}
 
 				rc.Spec.Template.Spec.Containers[i].Image = imageName
@@ -244,11 +244,11 @@ func deployRoute(w http.ResponseWriter, r *http.Request) {
 
 				imageName := ""
 
-				if containerNameToUpdate == "" {
+				if containerNameToUpdate == container.Name {
+					imageName = fmt.Sprintf("%s%s/%s:%s", *argDockerRegistry, imageNamespace, container.Name, branchName)
+				} else {
 					//default to current image tag if no annotations found
 					imageName = container.Image
-				} else {
-					imageName = fmt.Sprintf("%s%s/%s:%s", *argDockerRegistry, imageNamespace, dply.ObjectMeta.Labels["name"], branchName)
 				}
 
 				dply.Spec.Template.Spec.Containers[i].Image = imageName
