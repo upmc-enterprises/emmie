@@ -27,7 +27,8 @@ ON ANY THEORY OF LIABILITY, WHETHER IN CONTRACT, STRICT LIABILITY, OR TORT
 package main
 
 import (
-	"bufio"
+	"encoding/base64"
+	"encoding/json"
 	"flag"
 	"fmt"
 	"log"
@@ -36,12 +37,17 @@ import (
 	"strings"
 	"time"
 
+	"github.com/auth0/go-jwt-middleware"
+	jwt "github.com/dgrijalva/jwt-go"
 	"github.com/gorilla/mux"
 	"k8s.io/client-go/1.4/kubernetes"
 	"k8s.io/client-go/1.4/pkg/api/v1"
 	"k8s.io/client-go/1.4/pkg/apis/extensions/v1beta1"
-	"k8s.io/client-go/1.4/rest"
+	"k8s.io/client-go/1.4/tools/clientcmd"
 )
+
+/* Set up a global string for our secret */
+var jwtSigningKey = os.Getenv("AUTH0_CLIENT_SECRET")
 
 var (
 	argListenPort        = flag.Int("listen-port", 9080, "port to have API listen")
@@ -49,7 +55,6 @@ var (
 	argKubecfgFile       = flag.String("kubecfg-file", "", "Location of kubecfg file for access to kubernetes master service; --kube_master_url overrides the URL part of this; if neither this nor --kube_master_url are provided, defaults to service account tokens")
 	argKubeMasterURL     = flag.String("kube-master-url", "", "URL to reach kubernetes master. Env variables in this flag will be expanded.")
 	argTemplateNamespace = flag.String("template-namespace", "template", "Namespace to 'clone from when creating new deployments'")
-	argPathToTokens      = flag.String("path-to-tokens", "", "Full path including file name to tokens file for authorization, setting to empty string will disable.")
 	argSubDomain         = flag.String("subdomain", "k8s.local.com", "Subdomain used to configure external routing to branch (e.g. namespace.ci.k8s.local)")
 	client               *kubernetes.Clientset
 	defaultReplicaCount  *int32
@@ -65,25 +70,15 @@ func indexRoute(w http.ResponseWriter, r *http.Request) {
 }
 
 // Version (GET "/version")
-func versionRoute(w http.ResponseWriter, r *http.Request) {
-	if !tokenIsValid(r.FormValue("token")) {
-		w.WriteHeader(http.StatusUnauthorized)
-		return
-	}
-
+var versionRoute = http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 	fmt.Fprintf(w, "%q", appVersion)
-}
+})
 
 // Deploy (POST "/deploy/namespace/branchName")
 func deployRoute(w http.ResponseWriter, r *http.Request) {
 	vars := mux.Vars(r)
 	branchName := vars["branchName"]
 	imageNamespace := vars["namespace"]
-
-	if !tokenIsValid(r.FormValue("token")) {
-		w.WriteHeader(http.StatusUnauthorized)
-		return
-	}
 
 	// sanitize BranchName
 	branchName = strings.Replace(branchName, "_", "-", -1)
@@ -299,11 +294,6 @@ func updateRoute(w http.ResponseWriter, r *http.Request) {
 	branchName := vars["branchName"]
 	log.Println(w, "[Emmie] is updating branch:", branchName)
 
-	if !tokenIsValid(r.FormValue("token")) {
-		w.WriteHeader(http.StatusUnauthorized)
-		return
-	}
-
 	// sanitize BranchName
 	branchName = strings.Replace(branchName, "_", "-", -1)
 
@@ -317,11 +307,6 @@ func deleteRoute(w http.ResponseWriter, r *http.Request) {
 	vars := mux.Vars(r)
 	branchName := vars["branchName"]
 	log.Println("[Emmie] is deleting branch:", branchName)
-
-	if !tokenIsValid(r.FormValue("token")) {
-		w.WriteHeader(http.StatusUnauthorized)
-		return
-	}
 
 	// sanitize BranchName
 	branchName = strings.Replace(branchName, "_", "-", -1)
@@ -367,33 +352,28 @@ func deleteRoute(w http.ResponseWriter, r *http.Request) {
 	log.Println("[Emmie] is done deleting branch.")
 }
 
-func tokenIsValid(token string) bool {
-	// If no path is passed, then auth is disabled
-	if *argPathToTokens == "" {
-		return true
-	}
+// Get (GET "/deploy")
+func getRoute(w http.ResponseWriter, r *http.Request) {
+	ns, err := listNamespaces("deployedBy", "emmie")
 
-	file, err := os.Open(*argPathToTokens)
 	if err != nil {
-		log.Fatal(err)
-	}
-	defer file.Close()
-
-	scanner := bufio.NewScanner(file)
-	for scanner.Scan() {
-		if token == scanner.Text() {
-			fmt.Println("Token IS valid!")
-			return true
-		}
+		w.WriteHeader(http.StatusInternalServerError)
+		return
 	}
 
-	if err := scanner.Err(); err != nil {
-		log.Fatal(err)
-	}
-
-	fmt.Println("Token is NOT valid! =(")
-	return false
+	json.NewEncoder(w).Encode(ns)
 }
+
+var jwtMiddleware = jwtmiddleware.New(jwtmiddleware.Options{
+	ValidationKeyGetter: func(token *jwt.Token) (interface{}, error) {
+		signingKey, err := base64.URLEncoding.DecodeString(jwtSigningKey)
+		if err != nil {
+			return nil, err
+		}
+		return signingKey, nil
+	},
+	SigningMethod: jwt.SigningMethodHS256,
+})
 
 func main() {
 	flag.Parse()
@@ -410,7 +390,7 @@ func main() {
 	router.HandleFunc("/deploy/{namespace}/{branchName}", deployRoute).Methods("POST")
 	router.HandleFunc("/deploy/{branchName}", deleteRoute).Methods("DELETE")
 	router.HandleFunc("/deploy/{branchName}", updateRoute).Methods("PUT")
-	router.HandleFunc("/deploy", getDeploymentsRoute).Methods("GET")
+	router.HandleFunc("/deploy", getRoute).Methods("GET")
 
 	// Services
 	// router.HandleFunc("/services/{namespace}/{serviceName}", getServiceRoute).Methods("GET")
@@ -425,11 +405,11 @@ func main() {
 	// router.HandleFunc("/deployments/{namespace}/{key}/{value}", getDeploymentsRoute).Methods("GET")
 
 	// Version
-	router.HandleFunc("/version", versionRoute)
+	router.Handle("/version", jwtMiddleware.Handler(versionRoute)).Methods("GET")
 
 	// Create k8s client
-	config, err := rest.InClusterConfig()
-	//config, err := clientcmd.BuildConfigFromFlags("", *argKubecfgFile)
+	//config, err := rest.InClusterConfig()
+	config, err := clientcmd.BuildConfigFromFlags("", *argKubecfgFile)
 	if err != nil {
 		panic(err.Error())
 	}

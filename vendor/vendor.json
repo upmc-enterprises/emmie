@@ -3,6 +3,12 @@
 	"ignore": "test",
 	"package": [
 		{
+			"checksumSHA1": "7G7ADsNRwBcyfkJyTrX1oW4I0Rs=",
+			"path": "github.com/auth0/go-jwt-middleware",
+			"revision": "f3f7de3b9e394e3af3b88e1b9457f6f71d1ae0ac",
+			"revisionTime": "2016-04-21T21:57:38Z"
+		},
+		{
 			"checksumSHA1": "n+s4YwtzpMWW5Rt0dEaQa7NHDGQ=",
 			"origin": "k8s.io/client-go/1.4/vendor/github.com/blang/semver",
 			"path": "github.com/blang/semver",
@@ -15,6 +21,12 @@
 			"path": "github.com/davecgh/go-spew/spew",
 			"revision": "5974905c2ab2b6ff24107cbf7bc397d770a675da",
 			"revisionTime": "2016-09-27T23:38:16Z"
+		},
+		{
+			"checksumSHA1": "EsJksAKyY2+r3mY+rdNocSCe1wg=",
+			"path": "github.com/dgrijalva/jwt-go",
+			"revision": "24c63f56522a87ec5339cc3567883f1039378fdb",
+			"revisionTime": "2016-08-31T18:35:34Z"
 		},
 		{
 			"checksumSHA1": "f1wARLDzsF/JoyN01yoxXEwFIp8=",
@@ -728,5 +740,5 @@
 			"revisionTime": "2016-09-27T23:38:16Z"
 		}
 	],
-	"rootPath": "steve.io/emmie-api"
+	"rootPath": "enterprises.io/emmie"
 }
