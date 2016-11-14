@@ -51,12 +51,14 @@ var (
 	argTemplateNamespace = flag.String("template-namespace", "template", "Namespace to 'clone from when creating new deployments'")
 	argPathToTokens      = flag.String("path-to-tokens", "", "Full path including file name to tokens file for authorization, setting to empty string will disable.")
 	argSubDomain         = flag.String("subdomain", "k8s.local.com", "Subdomain used to configure external routing to branch (e.g. namespace.ci.k8s.local)")
+	argAwsRegion         = flag.String("awsregion", "us-east-1", "Region matching ECR")
+	argsAWSRegistryID    = flag.String("awsregistryid", "", "AWS registryID (account number)")
 	client               *kubernetes.Clientset
 	defaultReplicaCount  *int32
 )
 
 const (
-	appVersion = "0.0.3"
+	appVersion = "0.0.4"
 )
 
 // Default (GET "/")
@@ -198,13 +200,25 @@ func deployRoute(w http.ResponseWriter, r *http.Request) {
 			// Find the container which matches the annotation
 			for i, container := range rc.Spec.Template.Spec.Containers {
 
-				imageName := ""
+				imageName := container.Image
 
 				if containerNameToUpdate == rc.ObjectMeta.Name {
-					imageName = fmt.Sprintf("%s%s/%s:%s", *argDockerRegistry, imageNamespace, rc.ObjectMeta.Name, branchName)
-				} else {
-					//default to current image tag if no annotations found
-					imageName = container.Image
+					if *argsAWSRegistryID != "" {
+						// Check if image exists in ECR
+						imageTag := fmt.Sprintf("%s/%s", imageNamespace, rc.ObjectMeta.Name)
+						exists, err := imageTagExists(imageTag, branchName, *argAwsRegion, *argsAWSRegistryID)
+
+						if err != nil {
+							log.Println("Error looking up image tag in ECR: ", err)
+						}
+
+						// if the image tag exists, then update to use, otherwise default
+						if exists {
+							imageName = fmt.Sprintf("%s%s/%s:%s", *argDockerRegistry, imageNamespace, rc.ObjectMeta.Name, branchName)
+						}
+					} else {
+						imageName = fmt.Sprintf("%s%s/%s:%s", *argDockerRegistry, imageNamespace, rc.ObjectMeta.Name, branchName)
+					}
 				}
 
 				rc.Spec.Template.Spec.Containers[i].Image = imageName
@@ -242,13 +256,26 @@ func deployRoute(w http.ResponseWriter, r *http.Request) {
 			// Find the container which matches the annotation
 			for i, container := range dply.Spec.Template.Spec.Containers {
 
-				imageName := ""
+				imageName := container.Image
 
-				if containerNameToUpdate == container.Name {
-					imageName = fmt.Sprintf("%s%s/%s:%s", *argDockerRegistry, imageNamespace, container.Name, branchName)
-				} else {
-					//default to current image tag if no annotations found
-					imageName = container.Image
+				if containerNameToUpdate == dply.ObjectMeta.Name {
+
+					if *argsAWSRegistryID != "" {
+						// Check if image exists in ECR
+						imageTag := fmt.Sprintf("%s/%s", imageNamespace, dply.ObjectMeta.Name)
+						exists, err := imageTagExists(imageTag, branchName, *argAwsRegion, *argsAWSRegistryID)
+
+						if err != nil {
+							log.Println("Error looking up image tag in ECR: ", err)
+						}
+
+						// if the image tag exists, then update to use, otherwise default
+						if exists {
+							imageName = fmt.Sprintf("%s%s/%s:%s", *argDockerRegistry, imageNamespace, dply.ObjectMeta.Name, branchName)
+						}
+					} else {
+						imageName = fmt.Sprintf("%s%s/%s:%s", *argDockerRegistry, imageNamespace, dply.ObjectMeta.Name, branchName)
+					}
 				}
 
 				dply.Spec.Template.Spec.Containers[i].Image = imageName
