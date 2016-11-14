@@ -1,23 +1,23 @@
 apiVersion: v1
 kind: ReplicationController
 metadata:
-  name: emmie-v0.0.3
+  name: emmie-v0.0.4
   labels:
-    version: v0.0.3
+    version: v0.0.4
 spec:
   replicas: 1
   selector:
     name: emmie
-    version: v0.0.3
+    version: v0.0.4
   template:
     metadata:
       labels:
         name: emmie
-        version: v0.0.3
+        version: v0.0.4
     spec:
       containers:
       - name: emmie
-        image: stevesloka/emmie:0.0.3
+        image: stevesloka/emmie:0.0.4
         resources:
           limits:
             cpu: 100m
