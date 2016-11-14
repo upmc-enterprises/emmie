@@ -58,7 +58,7 @@ var (
 )
 
 const (
-	appVersion = "0.0.3"
+	appVersion = "0.0.4"
 )
 
 // Default (GET "/")

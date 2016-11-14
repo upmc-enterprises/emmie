@@ -4,7 +4,7 @@
 
 .PHONY: all emmie container push clean test
 
-TAG = 0.0.3
+TAG = 0.0.4
 PREFIX = stevesloka
 
 all: container
