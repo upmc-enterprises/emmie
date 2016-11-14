@@ -18,6 +18,11 @@ Emmie assists with creating unique and isolated environments for each feature be
 ## How it works
 Emmie integrates into the k8s api via the supported go client. Setup your CI server to build all Docker images and tag with branch name. Then send POST request and Emmie will look at all the services and replication controllers in the configured template namespace, and deploy to a new namespace. You can repeat this as many times as your cluster has resources.
 
+### AWS ECR Integration
+By default Emmie will tag all the images in the k8s cluster with the branch name requested, however, this means that a tag for the branchname MUST exist in the Docker registry. This can be cubersome since not all images will need to be build (e.g. default to develop) in addition, there is a large overhead of time involved. 
+
+Providing Emmie with the account credentials for the ECR repository you want to access, can now check if an image exists first, and if so, will use that tag, otherwise will default to your template image tag. 
+
 #### Routes
 * POST /deploy/{namespace}/{branchName} : Deploy a new branch
 * DELETE /deploy/{branchName} : Delete an environment
