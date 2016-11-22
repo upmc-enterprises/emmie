@@ -97,250 +97,236 @@ func deployRoute(w http.ResponseWriter, r *http.Request) {
 	if err != nil {
 		// TODO: Don't use error for logic
 		// Existing namespace, do an update
-		log.Println("Existing namespace found: ", branchName, " deleting pods.")
+		log.Println("Existing namespace found: ", branchName, " deleting objects.")
 
+		deleteAllObjects(branchName)
 		deletePodsByNamespace(branchName)
+
+		// Meh
+		time.Sleep(time.Second * 4)
 	} else {
 		log.Println("Namespace created, deploying new app...")
+	}
 
-		// copy controllers / services based on label query
-		rcs, _ := listReplicationControllersByNamespace(*argTemplateNamespace)
-		log.Println("Found ", len(rcs.Items), " template replication controllers to copy.")
+	// copy controllers / services based on label query
+	rcs, _ := listReplicationControllersByNamespace(*argTemplateNamespace)
+	log.Println("Found ", len(rcs.Items), " template replication controllers to copy.")
 
-		deployments, _ := listDeploymentsByNamespace(*argTemplateNamespace)
-		log.Println("Found ", len(deployments.Items), " template deployments to copy.")
+	deployments, _ := listDeploymentsByNamespace(*argTemplateNamespace)
+	log.Println("Found ", len(deployments.Items), " template deployments to copy.")
 
-		svcs, _ := listServicesByNamespace(*argTemplateNamespace)
-		log.Println("Found ", len(svcs.Items), " template services to copy.")
+	svcs, _ := listServicesByNamespace(*argTemplateNamespace)
+	log.Println("Found ", len(svcs.Items), " template services to copy.")
 
-		secrets, _ := listSecretsByNamespace(*argTemplateNamespace)
-		log.Println("Found ", len(secrets.Items), " template secrets to copy.")
+	secrets, _ := listSecretsByNamespace(*argTemplateNamespace)
+	log.Println("Found ", len(secrets.Items), " template secrets to copy.")
 
-		configmaps, _ := listConfigMapsByNamespace(*argTemplateNamespace)
-		log.Println("Found ", len(configmaps.Items), " template configmaps to copy.")
+	configmaps, _ := listConfigMapsByNamespace(*argTemplateNamespace)
+	log.Println("Found ", len(configmaps.Items), " template configmaps to copy.")
 
-		ingresses, _ := listIngresssByNamespace(*argTemplateNamespace)
-		log.Println("Found ", len(ingresses.Items), " template ingresses to copy.")
+	ingresses, _ := listIngresssByNamespace(*argTemplateNamespace)
+	log.Println("Found ", len(ingresses.Items), " template ingresses to copy.")
 
-		// create configmaps
-		for _, configmap := range configmaps.Items {
+	// create configmaps
+	for _, configmap := range configmaps.Items {
 
-			requestConfigMap := &v1.ConfigMap{
+		requestConfigMap := &v1.ConfigMap{
+			ObjectMeta: v1.ObjectMeta{
+				Name:      configmap.Name,
+				Namespace: branchName,
+			},
+			Data: configmap.Data,
+		}
+
+		createConfigMap(branchName, requestConfigMap)
+	}
+
+	// create secrets
+	for _, secret := range secrets.Items {
+
+		// skip service accounts
+		if secret.Type != "kubernetes.io/service-account-token" {
+
+			requestSecret := &v1.Secret{
 				ObjectMeta: v1.ObjectMeta{
-					Name:      configmap.Name,
+					Name:      secret.Name,
 					Namespace: branchName,
 				},
-				Data: configmap.Data,
+				Type: secret.Type,
+				Data: secret.Data,
 			}
 
-			createConfigMap(branchName, requestConfigMap)
+			createSecret(branchName, requestSecret)
+		}
+	}
+
+	// create services
+	for _, svc := range svcs.Items {
+
+		requestService := &v1.Service{
+			ObjectMeta: v1.ObjectMeta{
+				Name:      svc.ObjectMeta.Name,
+				Namespace: branchName,
+			},
 		}
 
-		// create secrets
-		for _, secret := range secrets.Items {
+		ports := []v1.ServicePort{}
+		for _, port := range svc.Spec.Ports {
+			newPort := v1.ServicePort{
+				Name:       port.Name,
+				Protocol:   port.Protocol,
+				Port:       port.Port,
+				TargetPort: port.TargetPort,
+			}
 
-			// skip service accounts
-			if secret.Type != "kubernetes.io/service-account-token" {
+			ports = append(ports, newPort)
+		}
 
-				requestSecret := &v1.Secret{
-					ObjectMeta: v1.ObjectMeta{
-						Name:      secret.Name,
-						Namespace: branchName,
-					},
-					Type: secret.Type,
-					Data: secret.Data,
-				}
+		requestService.Spec.Ports = ports
+		requestService.Spec.Selector = svc.Spec.Selector
+		requestService.Spec.Type = svc.Spec.Type
+		requestService.Labels = svc.Labels
 
-				createSecret(branchName, requestSecret)
+		createService(branchName, requestService)
+	}
+
+	// now that we have all replicationControllers, update them to have new image name
+	for _, rc := range rcs.Items {
+
+		containerNameToUpdate := ""
+
+		// Looks for annotations to know which container to replace
+		for key, value := range rc.Annotations {
+			if key == "emmie-update" {
+				containerNameToUpdate = value
 			}
 		}
 
-		// create services
-		for _, svc := range svcs.Items {
+		// Find the container which matches the annotation
+		for i, container := range rc.Spec.Template.Spec.Containers {
 
-			requestService := &v1.Service{
-				ObjectMeta: v1.ObjectMeta{
-					Name:      svc.ObjectMeta.Name,
-					Namespace: branchName,
-				},
-			}
+			imageName := container.Image
 
-			ports := []v1.ServicePort{}
-			for _, port := range svc.Spec.Ports {
-				newPort := v1.ServicePort{
-					Name:       port.Name,
-					Protocol:   port.Protocol,
-					Port:       port.Port,
-					TargetPort: port.TargetPort,
-				}
+			if containerNameToUpdate == rc.Spec.Template.Spec.Containers[i].Name {
+				if *argsAWSRegistryID != "" {
+					// Check if image exists in ECR
+					imageTag := fmt.Sprintf("%s/%s", imageNamespace, rc.ObjectMeta.Name)
+					exists, err := imageTagExists(imageTag, branchName, *argAwsRegion, *argsAWSRegistryID)
 
-				ports = append(ports, newPort)
-			}
+					if err != nil {
+						log.Println("Error looking up image tag in ECR: ", err)
+					}
 
-			requestService.Spec.Ports = ports
-			requestService.Spec.Selector = svc.Spec.Selector
-			requestService.Spec.Type = svc.Spec.Type
-			requestService.Labels = svc.Labels
-
-			createService(branchName, requestService)
-		}
-
-		// now that we have all replicationControllers, update them to have new image name
-		for _, rc := range rcs.Items {
-
-			containerNameToUpdate := ""
-
-			// Looks for annotations to know which container to replace
-			for key, value := range rc.Annotations {
-				if key == "emmie-update" {
-					containerNameToUpdate = value
-				}
-			}
-
-			// Find the container which matches the annotation
-			for i, container := range rc.Spec.Template.Spec.Containers {
-
-				imageName := container.Image
-
-				if containerNameToUpdate == rc.Spec.Template.Spec.Containers[i].Name {
-					if *argsAWSRegistryID != "" {
-						// Check if image exists in ECR
-						imageTag := fmt.Sprintf("%s/%s", imageNamespace, rc.ObjectMeta.Name)
-						exists, err := imageTagExists(imageTag, branchName, *argAwsRegion, *argsAWSRegistryID)
-
-						if err != nil {
-							log.Println("Error looking up image tag in ECR: ", err)
-						}
-
-						// if the image tag exists, then update to use, otherwise default
-						if exists {
-							imageName = fmt.Sprintf("%s%s/%s:%s", *argDockerRegistry, imageNamespace, rc.ObjectMeta.Name, branchName)
-						}
-					} else {
+					// if the image tag exists, then update to use, otherwise default
+					if exists {
 						imageName = fmt.Sprintf("%s%s/%s:%s", *argDockerRegistry, imageNamespace, rc.ObjectMeta.Name, branchName)
 					}
+				} else {
+					imageName = fmt.Sprintf("%s%s/%s:%s", *argDockerRegistry, imageNamespace, rc.ObjectMeta.Name, branchName)
 				}
-
-				rc.Spec.Template.Spec.Containers[i].Image = imageName
-
-				// Set the image pull policy to "Always"
-				rc.Spec.Template.Spec.Containers[i].ImagePullPolicy = "Always"
 			}
 
-			requestController := &v1.ReplicationController{
-				ObjectMeta: v1.ObjectMeta{
-					Name:      rc.ObjectMeta.Name,
-					Namespace: branchName,
-				},
-			}
+			rc.Spec.Template.Spec.Containers[i].Image = imageName
 
-			requestController.Spec = rc.Spec
-			requestController.Annotations = rc.Annotations
-			requestController.Spec.Replicas = defaultReplicaCount
-
-			// create new replication controller
-			createReplicationController(branchName, requestController)
+			// Set the image pull policy to "Always"
+			rc.Spec.Template.Spec.Containers[i].ImagePullPolicy = "Always"
 		}
 
-		// now that we have all deployments, update them to have new image name
-		for _, dply := range deployments.Items {
+		requestController := &v1.ReplicationController{
+			ObjectMeta: v1.ObjectMeta{
+				Name:      rc.ObjectMeta.Name,
+				Namespace: branchName,
+			},
+		}
 
-			containerNameToUpdate := ""
+		requestController.Spec = rc.Spec
+		requestController.Annotations = rc.Annotations
+		requestController.Spec.Replicas = defaultReplicaCount
 
-			// Looks for annotations to know which container to replace
-			for key, value := range dply.Annotations {
-				if key == "emmie-update" {
-					log.Printf("Container to update with emmie is: %s", value)
-					containerNameToUpdate = value
-				}
+		// create new replication controller
+		createReplicationController(branchName, requestController)
+	}
+
+	// now that we have all deployments, update them to have new image name
+	for _, dply := range deployments.Items {
+
+		containerNameToUpdate := ""
+
+		// Looks for annotations to know which container to replace
+		for key, value := range dply.Annotations {
+			if key == "emmie-update" {
+				log.Printf("Container to update with emmie is: %s", value)
+				containerNameToUpdate = value
 			}
+		}
 
-			// Find the container which matches the annotation
-			for i, container := range dply.Spec.Template.Spec.Containers {
+		// Find the container which matches the annotation
+		for i, container := range dply.Spec.Template.Spec.Containers {
 
-				imageName := container.Image
+			imageName := container.Image
 
-				if containerNameToUpdate == dply.Spec.Template.Spec.Containers[i].Name {
+			if containerNameToUpdate == dply.Spec.Template.Spec.Containers[i].Name {
 
-					if *argsAWSRegistryID != "" {
-						// Check if image exists in ECR
-						imageTag := fmt.Sprintf("%s/%s", imageNamespace, dply.ObjectMeta.Name)
-						exists, err := imageTagExists(imageTag, branchName, *argAwsRegion, *argsAWSRegistryID)
+				if *argsAWSRegistryID != "" {
+					// Check if image exists in ECR
+					imageTag := fmt.Sprintf("%s/%s", imageNamespace, dply.ObjectMeta.Name)
+					exists, err := imageTagExists(imageTag, branchName, *argAwsRegion, *argsAWSRegistryID)
 
-						if err != nil {
-							log.Println("Error looking up image tag in ECR: ", err)
-						}
+					if err != nil {
+						log.Println("Error looking up image tag in ECR: ", err)
+					}
 
-						// if the image tag exists, then update to use, otherwise default
-						if exists {
-							log.Printf("Image tag found in ECR, updating image [%s] with tag [%s]", dply.ObjectMeta.Name, branchName)
-							imageName = fmt.Sprintf("%s%s/%s:%s", *argDockerRegistry, imageNamespace, dply.ObjectMeta.Name, branchName)
-						}
-					} else {
+					// if the image tag exists, then update to use, otherwise default
+					if exists {
+						log.Printf("Image tag found in ECR, updating image [%s] with tag [%s]", dply.ObjectMeta.Name, branchName)
 						imageName = fmt.Sprintf("%s%s/%s:%s", *argDockerRegistry, imageNamespace, dply.ObjectMeta.Name, branchName)
 					}
+				} else {
+					imageName = fmt.Sprintf("%s%s/%s:%s", *argDockerRegistry, imageNamespace, dply.ObjectMeta.Name, branchName)
 				}
-
-				dply.Spec.Template.Spec.Containers[i].Image = imageName
-
-				// Set the image pull policy to "Always"
-				dply.Spec.Template.Spec.Containers[i].ImagePullPolicy = "Always"
 			}
 
-			deployment := &v1beta1.Deployment{
-				ObjectMeta: v1.ObjectMeta{
-					Name:      dply.ObjectMeta.Name,
-					Namespace: branchName,
-				},
-			}
+			dply.Spec.Template.Spec.Containers[i].Image = imageName
 
-			deployment.Spec = dply.Spec
-			deployment.Annotations = dply.Annotations
-			deployment.Spec.Replicas = defaultReplicaCount
-
-			// create new replication controller
-			createDeployment(branchName, deployment)
+			// Set the image pull policy to "Always"
+			dply.Spec.Template.Spec.Containers[i].ImagePullPolicy = "Always"
 		}
 
-		// create ingress
-		for _, ingress := range ingresses.Items {
-
-			rules := ingress.Spec.Rules
-			rules[0].Host = fmt.Sprintf("%s.%s", branchName, *argSubDomain)
-
-			requestIngress := &v1beta1.Ingress{
-				ObjectMeta: v1.ObjectMeta{
-					Name:      ingress.Name,
-					Namespace: branchName,
-				},
-				Spec: v1beta1.IngressSpec{
-					Rules: rules,
-				},
-			}
-
-			createIngress(branchName, requestIngress)
+		deployment := &v1beta1.Deployment{
+			ObjectMeta: v1.ObjectMeta{
+				Name:      dply.ObjectMeta.Name,
+				Namespace: branchName,
+			},
 		}
+
+		deployment.Spec = dply.Spec
+		deployment.Annotations = dply.Annotations
+		deployment.Spec.Replicas = defaultReplicaCount
+
+		// create new deployment
+		createDeployment(branchName, deployment)
 	}
+
+	// create ingress
+	for _, ingress := range ingresses.Items {
+
+		rules := ingress.Spec.Rules
+		rules[0].Host = fmt.Sprintf("%s.%s", branchName, *argSubDomain)
+
+		requestIngress := &v1beta1.Ingress{
+			ObjectMeta: v1.ObjectMeta{
+				Name:      ingress.Name,
+				Namespace: branchName,
+			},
+			Spec: v1beta1.IngressSpec{
+				Rules: rules,
+			},
+		}
+
+		createIngress(branchName, requestIngress)
+	}
+
 	log.Println("[Emmie] is finished deploying branch!")
-}
-
-// Put (PUT "/deploy")
-func updateRoute(w http.ResponseWriter, r *http.Request) {
-	vars := mux.Vars(r)
-	branchName := vars["branchName"]
-	log.Println(w, "[Emmie] is updating branch:", branchName)
-
-	if !tokenIsValid(r.FormValue("token")) {
-		w.WriteHeader(http.StatusUnauthorized)
-		return
-	}
-
-	// sanitize BranchName
-	branchName = strings.Replace(branchName, "_", "-", -1)
-
-	deletePodsByNamespace(branchName)
-
-	log.Println("Finished updating branch!")
 }
 
 // Delete (DELETE "/deploy")
@@ -357,6 +343,13 @@ func deleteRoute(w http.ResponseWriter, r *http.Request) {
 	// sanitize BranchName
 	branchName = strings.Replace(branchName, "_", "-", -1)
 
+	deleteAllObjects(branchName)
+	deleteNamespace(branchName)
+	log.Println("[Emmie] is done deleting branch.")
+}
+
+// Deletes everything but the namespace
+func deleteAllObjects(branchName string) {
 	// get controllers / services / secrets in namespace
 	rcs, _ := listReplicationControllersByNamespace(*argTemplateNamespace)
 	for _, rc := range rcs.Items {
@@ -393,9 +386,6 @@ func deleteRoute(w http.ResponseWriter, r *http.Request) {
 		deleteIngress(branchName, ingress.ObjectMeta.Name)
 		log.Println("Deleted ingress:", ingress.ObjectMeta.Name)
 	}
-
-	deleteNamespace(branchName)
-	log.Println("[Emmie] is done deleting branch.")
 }
 
 func tokenIsValid(token string) bool {
@@ -440,7 +430,6 @@ func main() {
 	router.HandleFunc("/", indexRoute)
 	router.HandleFunc("/deploy/{namespace}/{branchName}", deployRoute).Methods("POST")
 	router.HandleFunc("/deploy/{branchName}", deleteRoute).Methods("DELETE")
-	router.HandleFunc("/deploy/{branchName}", updateRoute).Methods("PUT")
 	router.HandleFunc("/deploy", getDeploymentsRoute).Methods("GET")
 
 	// Services
