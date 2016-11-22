@@ -202,7 +202,7 @@ func deployRoute(w http.ResponseWriter, r *http.Request) {
 
 				imageName := container.Image
 
-				if containerNameToUpdate == rc.ObjectMeta.Name {
+				if containerNameToUpdate == rc.Spec.Template.Spec.Containers[i].Name {
 					if *argsAWSRegistryID != "" {
 						// Check if image exists in ECR
 						imageTag := fmt.Sprintf("%s/%s", imageNamespace, rc.ObjectMeta.Name)
@@ -235,6 +235,7 @@ func deployRoute(w http.ResponseWriter, r *http.Request) {
 			}
 
 			requestController.Spec = rc.Spec
+			requestController.Annotations = rc.Annotations
 			requestController.Spec.Replicas = defaultReplicaCount
 
 			// create new replication controller
@@ -249,6 +250,7 @@ func deployRoute(w http.ResponseWriter, r *http.Request) {
 			// Looks for annotations to know which container to replace
 			for key, value := range dply.Annotations {
 				if key == "emmie-update" {
+					log.Printf("Container to update with emmie is: %s", value)
 					containerNameToUpdate = value
 				}
 			}
@@ -258,7 +260,7 @@ func deployRoute(w http.ResponseWriter, r *http.Request) {
 
 				imageName := container.Image
 
-				if containerNameToUpdate == dply.ObjectMeta.Name {
+				if containerNameToUpdate == dply.Spec.Template.Spec.Containers[i].Name {
 
 					if *argsAWSRegistryID != "" {
 						// Check if image exists in ECR
@@ -271,6 +273,7 @@ func deployRoute(w http.ResponseWriter, r *http.Request) {
 
 						// if the image tag exists, then update to use, otherwise default
 						if exists {
+							log.Printf("Image tag found in ECR, updating image [%s] with tag [%s]", dply.ObjectMeta.Name, branchName)
 							imageName = fmt.Sprintf("%s%s/%s:%s", *argDockerRegistry, imageNamespace, dply.ObjectMeta.Name, branchName)
 						}
 					} else {
@@ -292,6 +295,7 @@ func deployRoute(w http.ResponseWriter, r *http.Request) {
 			}
 
 			deployment.Spec = dply.Spec
+			deployment.Annotations = dply.Annotations
 			deployment.Spec.Replicas = defaultReplicaCount
 
 			// create new replication controller
