@@ -15,6 +15,14 @@ Emmie assists with creating unique and isolated environments for each feature be
 * template-namespace: Namespace to 'clone from when creating new deployments'
 * path-to-tokens: Full path including file name to tokens file for authorization, setting to empty string will disable.
 
+## Building
+
+* Install Go
+  * Set your $GOPATH to something you like
+* Checkout or move this source directory to $GOPATH/src
+* Run `cd $GOPATH/src/emmie && make emmie` to get dependencies and build project
+* To build the docker immage, run `make`
+
 ## How it works
 Emmie integrates into the k8s api via the supported go client. Setup your CI server to build all Docker images and tag with branch name. Then send POST request and Emmie will look at all the services and replication controllers in the configured template namespace, and deploy to a new namespace. You can repeat this as many times as your cluster has resources.
 
