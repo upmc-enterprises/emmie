@@ -17,7 +17,7 @@ Emmie assists with creating unique and isolated environments for each feature be
 
 ## Building
 
-* Install Go
+* [Install Go](https://golang.org/doc/install)
   * Set your $GOPATH to something you like
 * Checkout or move this source directory to $GOPATH/src
 * Run `cd $GOPATH/src/emmie && make emmie` to get dependencies and build project
@@ -26,7 +26,9 @@ Emmie assists with creating unique and isolated environments for each feature be
   * To push to Amazon ECR, create a repo and follow the instructions from the platform
 
 ## Get Started
-1. Create auth tokens file (how?)
+1. Create auth tokens file
+  * `openssl rand -base64 1024 | shasum`
+  * copy information to `k8s/secret.json`
 * Generate certs (or copy certs from your existing kubectl installation?)
 * Deploy Emmie to your cluster ([See samples](k8s))
 * Deploy Router to your cluster (`kubectl create -f k8s/router.yml`)

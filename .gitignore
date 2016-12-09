@@ -1,3 +1,4 @@
 emmie
 .vscode/
 tokens.txt
+k8s/secret.json
