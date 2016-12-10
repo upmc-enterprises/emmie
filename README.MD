@@ -21,6 +21,7 @@ Emmie assists with creating unique and isolated environments for each feature be
   * Set your $GOPATH to something you like
 * Checkout or move this source directory to $GOPATH/src
 * Run `cd $GOPATH/src/emmie && make emmie` to get dependencies and build project
+* Delete the contents of `certs/` and generate certs as documented below
 * To build the docker immage, run `make`
 * To push your image to docker hub, set $PREFIX to your account name, then `make push`
   * To push to Amazon ECR, create a repo and follow the instructions from the platform
