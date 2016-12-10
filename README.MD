@@ -28,7 +28,7 @@ Emmie assists with creating unique and isolated environments for each feature be
 
 ## Get Started
 1. Create auth tokens file
-  * `openssl rand -base64 1024 | shasum`
+  * `openssl rand -base64 1024 | shasum | awk '{ print $1}' > tokens.txt`
   * `cp k8s/secret.json.example k8s/secret.json`
   * copy token to `k8s/secret.json`
 * Deploy Emmie to your cluster ([See samples](k8s))
