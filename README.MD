@@ -30,9 +30,9 @@ Emmie assists with creating unique and isolated environments for each feature be
   * `openssl rand -base64 1024 | shasum`
   * `cp k8s/secret.json.example k8s/secret.json`
   * copy token to `k8s/secret.json`
-* Generate certs (or copy certs from your existing kubectl installation?)
+* Delete the contents of `certs/` and generate certs as documented below
 * Deploy Emmie to your cluster ([See samples](k8s))
-* Deploy Router to your cluster (`kubectl create -f k8s/router.yml`)
+  * Optionally, deploy a custom router to your cluster (`kubectl create -f k8s/router.yml`). If your cluster is on AWS this is not needed
 * Create template namespace (how?)
 * Deploy template services / replication controllers
   * _NOTE: Make sure your templates have correct Annotations on them for what to deploy (See [Annotations](#annotations) section below)._
