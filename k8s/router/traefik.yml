@@ -42,6 +42,10 @@ kind: Service
 apiVersion: v1
 metadata:
   name: traefik
+  annotations:
+    service.beta.kubernetes.io/aws-load-balancer-ssl-cert: <<CertArn>>
+    service.beta.kubernetes.io/aws-load-balancer-backend-protocol: https
+    service.beta.kubernetes.io/aws-load-balancer-ssl-ports: "443"
 spec:
   type: LoadBalancer
   ports:

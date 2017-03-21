@@ -58,7 +58,7 @@ var (
 )
 
 const (
-	appVersion = "0.0.4"
+	appVersion = "0.0.5"
 )
 
 // Default (GET "/")
@@ -307,23 +307,32 @@ func deployRoute(w http.ResponseWriter, r *http.Request) {
 		createDeployment(branchName, deployment)
 	}
 
+	appendContainerToIngress := len(ingresses.Items) > 0
+	namespace := branchName
+
 	// create ingress
 	for _, ingress := range ingresses.Items {
 
 		rules := ingress.Spec.Rules
+
+		// Found multiple ingresses, append ingress name to make unique
+		if appendContainerToIngress {
+			branchName = fmt.Sprintf("%s-%s", ingress.Name, namespace)
+		}
+
 		rules[0].Host = fmt.Sprintf("%s.%s", branchName, *argSubDomain)
 
 		requestIngress := &v1beta1.Ingress{
 			ObjectMeta: v1.ObjectMeta{
 				Name:      ingress.Name,
-				Namespace: branchName,
+				Namespace: namespace,
 			},
 			Spec: v1beta1.IngressSpec{
 				Rules: rules,
 			},
 		}
 
-		createIngress(branchName, requestIngress)
+		createIngress(namespace, requestIngress)
 	}
 
 	log.Println("[Emmie] is finished deploying branch!")
