@@ -10,12 +10,38 @@ Emmie assists with creating unique and isolated environments for each feature be
 * Deploy all replication controllers and services to a template namespace. This can be a new namespace or configured to be "develop" branch
 
 ### Application Arguments:
-* listen-port: Port Emmie will listen on to take requests (NOTE: Only listents on HTTPS)
+* listen-port: Port Emmie will listen on to take requests (NOTE: Only listens on HTTPS)
 * docker-registry: Set to url of private docker registry
 * template-namespace: Namespace to 'clone from when creating new deployments'
 * path-to-tokens: Full path including file name to tokens file for authorization, setting to empty string will disable.
 
+## Building
+
+* [Install Go](https://golang.org/doc/install)
+  * Set your $GOPATH to something you like
+* Checkout or move this source directory to $GOPATH/src
+* Run `cd $GOPATH/src/emmie && make emmie` to get dependencies and build project
+* Delete the contents of `certs/` and generate certs as documented below
+* To build the docker immage, run `make`
+* To push your image to docker hub, set $PREFIX to your account name, then `make push`
+  * To push to Amazon ECR, create a repo and follow the instructions from the platform
+
+## Get Started
+1. Create auth tokens file
+  * `openssl rand -base64 1024 | shasum | awk '{ print $1}' > tokens.txt`
+  * `cp k8s/secret.json.example k8s/secret.json`
+  * copy token to `k8s/secret.json`
+* Deploy Emmie to your cluster ([See samples](k8s))
+  * Optionally, deploy a custom router to your cluster (`kubectl create -f k8s/router.yml`). If your cluster is on AWS this is not needed
+* Create template namespaces based on your existing pod and service specifications, see `k8s/templates/`
+* Deploy template services / replication controllers
+  * _NOTE: Make sure your templates have correct Annotations on them for what to deploy (See [Annotations](#annotations) section below)._
+* Configure CI to build feature branch images
+* Configure CI to curl Emmie and deploy new namespace. The spec is below.
+* Bask in the glory of how your team will produce better well tested code
+
 ## How it works
+
 Emmie integrates into the k8s api via the supported go client. Setup your CI server to build all Docker images and tag with branch name. Then send POST request and Emmie will look at all the services and replication controllers in the configured template namespace, and deploy to a new namespace. You can repeat this as many times as your cluster has resources.
 
 ### AWS ECR Integration
@@ -31,18 +57,6 @@ Providing Emmie with the account credentials for the ECR repository you want to 
 
 _NOTE: Include a token query string to end of all requests for simple auth._
 
-## Get Started
-1. Create auth tokens file
-* Generate certs
-* Deploy Emmie to your cluster ([See samples](k8s))
-* Deploy Router to your cluster (`kubectl create -f k8s/router.yml`)
-* Create template namespace
-* Deploy template services / replication controllers
-  * _NOTE: Make sure your templates have correct Annotations on them for what to deploy (See [Annotations](#annotations) section below)._
-* Configure CI to build feature branch images
-* Configure CI to curl Emmie and deploy new namespace
-* Bask in the glory of how your team will produce better well tested code
-
 ### Annotations
 
 Since a pod can be made up of many containers, an annotation is required to tell Emmie how to update that pod when deploying new code. In the example below, Emmie looks for the key `emmie-update` and uses the value to find the container name to replace. In this case the container named `web` in the pod will be updated with the feature branch deploy.
@@ -51,7 +65,6 @@ Since a pod can be made up of many containers, an annotation is required to tell
 annotations:
       emmie-update: web
 ```
-
 
 ## Generate Self-Signed cert
 `openssl req -x509 -newkey rsa:2048 -keyout key.pem -out cert.pem -days 365 -nodes`
